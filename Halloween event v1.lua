@@ -257,7 +257,7 @@ local function flyTo(dest)
         hrp.Anchored = false 
         hrp.CFrame = CFrame.new(dest)
         hrp.AssemblyLinearVelocity = Vector3.zero
-        task.wait(1) 
+        task.wait(.5) 
         if env.auto and env._menuId == myId then hrp.Anchored = true end
     else
         hrp.Anchored = true
