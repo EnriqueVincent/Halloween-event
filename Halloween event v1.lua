@@ -31,6 +31,16 @@ env.mode     = "near"
 env.moveMode = "fly"
 env.autoCave = false
 
+local function sendNotification(title, text)
+    pcall(function()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = 8 -- How long the notification stays on screen (in seconds)
+        })
+    end)
+end
+
 -- ===================== GUI =====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HalloweenMenu"; screenGui.ResetOnSpawn = false
@@ -247,7 +257,7 @@ local function flyTo(dest)
         hrp.Anchored = false 
         hrp.CFrame = CFrame.new(dest)
         hrp.AssemblyLinearVelocity = Vector3.zero
-        task.wait(0.4) 
+        task.wait(1) 
         if env.auto and env._menuId == myId then hrp.Anchored = true end
     else
         hrp.Anchored = true
@@ -410,9 +420,17 @@ task.spawn(function()
                         if not triggerPrompt(prompt) then
                             triggerPromptsNear(part.Position, 8)
                         end
+                        
+                        -- Fire the remote for normal candies
                         if id ~= "Yin" and id ~= "Yang" then
                             CollectCandy:FireServer(id)
+                        else
+                            -- If it IS a sigil, send a pop-up notification to your screen
+                            if attempt == 1 then
+                                sendNotification("🔮 Sigil Sniper", "Successfully collected the " .. id .. " sigil!")
+                            end
                         end
+                        
                         task.wait(0.3)
 
                         if part.Parent ~= CANDY_FOLDER and part.Parent ~= workspace then break end
