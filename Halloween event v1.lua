@@ -1,5 +1,5 @@
 --[[=====================================================
-    MENU HALLOWEEN v18 by Vince (Instant Prompts & Dynamic Dip)
+    MENU HALLOWEEN v20 by Vince (Egg Return Wait Fix)
 =====================================================]]
 
 local Players      = game:GetService("Players")
@@ -49,7 +49,7 @@ local speeds = {
 local currentSpeedIdx = 1
 env.speed = speeds[currentSpeedIdx].value
 
--- UI COLORS (Modern Theme)
+-- UI COLORS
 local C_BG = Color3.fromRGB(20, 20, 25)
 local C_SIDEBAR = Color3.fromRGB(28, 28, 35)
 local C_ACCENT = Color3.fromRGB(255, 120, 0)
@@ -98,7 +98,7 @@ local function slowFlyTo(dest)
     local total = (dest - start).Magnitude
     if total >= 2 then
         local travelled, guard = 0, 0
-        local slowSpeed = 45 -- Slow, cinematic speed
+        local slowSpeed = 45
         while env._menuId == myId and guard < 5000 do
             local dt = RunService.Heartbeat:Wait()
             guard += 1
@@ -132,33 +132,43 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
                 if dipRemote then 
                     dipRemote:FireServer() 
-                    sendNotification("Auto Dip", "Egg dipped! Waiting for process to finish...")
+                    sendNotification("Auto Dip", "Egg dipped! Waiting for it to return...")
                 end
                 
-                -- 2. DYNAMIC WAIT: Wait for the process to physically finish
-                task.wait(1) -- Buffer for server to start the dip
+                -- 2. DYNAMIC WAIT: Wait for the egg to COME BACK
+                task.wait(2) -- Buffer to allow the volcano to take the egg away
                 local timeout = 0
-                while timeout < 100 do -- Max 10 second timeout fallback
+                while timeout < 150 do -- 15 second max timeout fallback
                     task.wait(0.1)
                     timeout = timeout + 1
                     
-                    local isAnchored = hrp.Anchored
-                    local hasEggEquipped = false
+                    local hasEgg = false
+                    
+                    -- Check if character is holding it
                     if plr.Character then
                         for _, child in ipairs(plr.Character:GetChildren()) do
-                            if child:IsA("Tool") or child.Name:lower():find("egg") then
-                                hasEggEquipped = true
+                            if child:IsA("Tool") and child.Name:lower():find("egg") then
+                                hasEgg = true
                                 break
                             end
                         end
                     end
                     
-                    -- If character is free to move and has no egg tool, the process is done
-                    if not isAnchored and not hasEggEquipped then
-                        break 
+                    -- Check if it was placed in the backpack
+                    local bp = plr:FindFirstChild("Backpack")
+                    if bp and not hasEgg then
+                        for _, child in ipairs(bp:GetChildren()) do
+                            if child:IsA("Tool") and child.Name:lower():find("egg") then
+                                hasEgg = true
+                                break
+                            end
+                        end
                     end
+                    
+                    -- If the new egg is back in our possession, break the loop
+                    if hasEgg then break end 
                 end
-                task.wait(0.5) -- Tiny safety buffer before teleporting away
+                task.wait(0.8) -- Small buffer to let the animation completely reset
                 
                 -- 3. Teleport to Food Stalls
                 hrp = charHRP()
@@ -166,7 +176,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     hrp.CFrame = CFrame.new(FOOD_STALL_COORDS)
                     task.wait(0.6)
                     
-                    -- 4. Dynamically find ranch and fly to it
+                    -- 4. Fly to Ranch
                     local ranchPos = getPlayerRanchCoords()
                     if ranchPos then
                         sendNotification("Auto Dip Sequence", "Flying back to your Ranch!")
@@ -197,7 +207,7 @@ toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.fromOffset(420, 360) -- Slightly taller for moved button
+mainFrame.Size = UDim2.fromOffset(420, 360)
 mainFrame.Position = UDim2.new(0, 20, 0, 80)
 mainFrame.BackgroundColor3 = C_BG
 mainFrame.BorderSizePixel = 0; mainFrame.Active = true; mainFrame.Draggable = true
@@ -266,7 +276,7 @@ halloweenFrame.Size = UDim2.new(1, 0, 1, 0); halloweenFrame.BackgroundTransparen
 halloweenFrame.Parent = contentArea
 
 local autoButton = createButton(halloweenFrame, "AUTO FARM: OFF", 10, 40, 14)
-local autoBuyBtn = createButton(halloweenFrame, "BUY SHOP EGG: OFF", 55, 40, 12) -- MOVED HERE
+local autoBuyBtn = createButton(halloweenFrame, "BUY SHOP EGG: OFF", 55, 40, 12)
 local modeButton = createButton(halloweenFrame, "ORDER: NEAREST", 100, 30, 11)
 local moveButton = createButton(halloweenFrame, "MOVEMENT: FLY", 135, 30, 11)
 local caveButton = createButton(halloweenFrame, "OPEN CAVE: OFF", 170, 30, 11)
@@ -417,36 +427,24 @@ local function updateFlyingState()
     end
 end
 
--- UPGRADED: Instantly triggers prompts regardless of UI cover or camera angle
+-- PROMPT TRIGGER
 local function triggerPrompt(prompt)
     if not prompt or not prompt.Enabled then return false end
     
-    -- Attempt 1: Exploit Native Function (Instantly fires it without holding)
-    if fireproximityprompt then
-        pcall(fireproximityprompt, prompt, 1, true)
-        return true
-    end
-    
-    -- Attempt 2: Fallback (Forces the prompt to require 0 time and ignore UI/Line of Sight)
     local oldLOS = prompt.RequiresLineOfSight
-    local oldDur = prompt.HoldDuration
-    local oldMax = prompt.MaxActivationDistance
-    
     prompt.RequiresLineOfSight = false
-    prompt.HoldDuration = 0
-    prompt.MaxActivationDistance = 100
+    
+    if fireproximityprompt then
+        pcall(function() fireproximityprompt(prompt, 1, true) end)
+    end
     
     pcall(function()
         prompt:InputHoldBegin()
-        task.wait(0.05)
+        task.wait(math.max(prompt.HoldDuration, 0.05) + 0.05)
         prompt:InputHoldEnd()
     end)
     
-    -- Restore original properties
     prompt.RequiresLineOfSight = oldLOS
-    prompt.HoldDuration = oldDur
-    prompt.MaxActivationDistance = oldMax
-    
     return true
 end
 
@@ -721,7 +719,6 @@ task.spawn(function()
                         if not env.auto or env._menuId ~= myId then break end
                         local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
                         
-                        -- Upgraded trigger runs here
                         if not triggerPrompt(prompt) then triggerPromptsNear(part.Position, 8) end
                         
                         if id ~= "Yin" and id ~= "Yang" then CollectCandy:FireServer(id)
@@ -762,4 +759,4 @@ env._menuCleanup = function()
     screenGui:Destroy()
 end
 
-print("[Menu Halloween v18 | Instant Prompts & Dynamic Dip] loaded.")
+print("[Menu Halloween v20 | Egg Return Wait Fix] loaded.")
