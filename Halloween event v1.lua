@@ -14,8 +14,8 @@ local CollectCandy = GameRemotes:WaitForChild("CollectCandy")
 local CANDY_FOLDER = workspace:WaitForChild("HalloweenCandy")
 local DROPOFF      = workspace:WaitForChild("CandyDropOff")
 
--- [ UPDATE THESE VOLCANO COORDINATES ]
-local VOLCANO_COORDS = Vector3.new(0, 500, 0) 
+-- [ VOLCANO COORDINATES ]
+local VOLCANO_COORDS = Vector3.new(-5109.14, 41435.2, -3472.42) 
 local FOOD_STALL_COORDS = Vector3.new(125.546, 40322.6, 948.211)
 
 local DepositRemote
