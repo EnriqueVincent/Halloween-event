@@ -136,7 +136,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                 end
                 
                 -- 2. STRICT WAIT: 5 seconds after dipping
-                task.wait(5)
+                task.wait(8)
                 
                 -- 3. Teleport to Food Stalls
                 hrp = charHRP()
@@ -145,7 +145,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     sendNotification("Auto Dip Sequence", "At Food Stalls. Waiting 3 seconds...")
                     
                     -- 4. STRICT WAIT: 3 seconds at food stalls
-                    task.wait(3)
+                    task.wait(5)
                     
                     -- 5. Fly to Ranch
                     local ranchPos = getPlayerRanchCoords()
