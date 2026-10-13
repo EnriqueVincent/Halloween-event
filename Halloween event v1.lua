@@ -1,5 +1,5 @@
 --[[=====================================================
-    MENU HALLOWEEN v20 by Vince (Egg Return Wait Fix)
+    MENU HALLOWEEN v21 by Vince (Strict Dip Timers)
 =====================================================]]
 
 local Players      = game:GetService("Players")
@@ -132,51 +132,22 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
                 if dipRemote then 
                     dipRemote:FireServer() 
-                    sendNotification("Auto Dip", "Egg dipped! Waiting for it to return...")
+                    sendNotification("Auto Dip", "Egg dipped! Waiting 5 seconds...")
                 end
                 
-                -- 2. DYNAMIC WAIT: Wait for the egg to COME BACK
-                task.wait(2) -- Buffer to allow the volcano to take the egg away
-                local timeout = 0
-                while timeout < 150 do -- 15 second max timeout fallback
-                    task.wait(0.1)
-                    timeout = timeout + 1
-                    
-                    local hasEgg = false
-                    
-                    -- Check if character is holding it
-                    if plr.Character then
-                        for _, child in ipairs(plr.Character:GetChildren()) do
-                            if child:IsA("Tool") and child.Name:lower():find("egg") then
-                                hasEgg = true
-                                break
-                            end
-                        end
-                    end
-                    
-                    -- Check if it was placed in the backpack
-                    local bp = plr:FindFirstChild("Backpack")
-                    if bp and not hasEgg then
-                        for _, child in ipairs(bp:GetChildren()) do
-                            if child:IsA("Tool") and child.Name:lower():find("egg") then
-                                hasEgg = true
-                                break
-                            end
-                        end
-                    end
-                    
-                    -- If the new egg is back in our possession, break the loop
-                    if hasEgg then break end 
-                end
-                task.wait(0.8) -- Small buffer to let the animation completely reset
+                -- 2. STRICT WAIT: 5 seconds after dipping
+                task.wait(5)
                 
                 -- 3. Teleport to Food Stalls
                 hrp = charHRP()
                 if hrp then
                     hrp.CFrame = CFrame.new(FOOD_STALL_COORDS)
-                    task.wait(0.6)
+                    sendNotification("Auto Dip Sequence", "At Food Stalls. Waiting 3 seconds...")
                     
-                    -- 4. Fly to Ranch
+                    -- 4. STRICT WAIT: 3 seconds at food stalls
+                    task.wait(3)
+                    
+                    -- 5. Fly to Ranch
                     local ranchPos = getPlayerRanchCoords()
                     if ranchPos then
                         sendNotification("Auto Dip Sequence", "Flying back to your Ranch!")
@@ -759,4 +730,4 @@ env._menuCleanup = function()
     screenGui:Destroy()
 end
 
-print("[Menu Halloween v20 | Egg Return Wait Fix] loaded.")
+print("[Menu Halloween v21 | Strict Dip Timers] loaded.")
