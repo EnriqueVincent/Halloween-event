@@ -458,111 +458,7 @@ plr.CharacterAdded:Connect(function()
     if env.auto then setFlying(true) end
 end)
 
--- ===================== ciclo =====================
-task.spawn(function()
-    while env._menuId == myId do
-        if env.auto then
-            
-            if env.autoCave then
-                local caveDoor
-                for _, p in ipairs(workspace:GetDescendants()) do
-                    if p:IsA("BasePart") and (p.Name:lower():find("cavedoor") or p.Name:lower():find("ritual")) then
-                        if p:FindFirstChildWhichIsA("ProximityPrompt", true) then
-                            caveDoor = p
-   Mode == "teleport" then
-        hrp.Anchored = false 
-        hrp.CFrame = CFrame.new(dest)
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        task.wait(.5) 
-        if env.auto and env._menuId == myId then hrp.Anchored = true end
-    else
-        hrp.Anchored = true
-        local start = hrp.Position
-        local total = (dest - start).Magnitude
-        if total >= 2 then
-            local travelled, guard = 0, 0
-            while env.auto and env._menuId == myId and guard < 5000 do
-                local dt = RunService.Heartbeat:Wait()
-                guard += 1
-                travelled = math.min(travelled + env.speed * dt, total)
-                local prog = travelled / total
-                local base = start:Lerp(dest, prog)
-                local arc  = math.sin(prog * math.pi) * env.arc
-                hrp.CFrame = CFrame.new(base + Vector3.new(0, arc, 0))
-                if prog >= 1 then break end
-            end
-        end
-        hrp.CFrame = CFrame.new(dest)
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        hrp.Anchored = false
-        task.wait(0.15)
-        if env.auto and env._menuId == myId then hrp.Anchored = true end
-        task.wait(0.05)
-    end
-end
-
-local function candyId(part, idx)
-    for _, c in ipairs(part:GetChildren()) do
-        if c:IsA("ValueBase") then return tostring(c.Value) end
-    end
-    for _, a in ipairs({"Id","CandyId","Index","Number","ID"}) do
-        local v = part:GetAttribute(a); if v then return tostring(v) end
-    end
-    local n = part.Name:match("(%d+)")
-    if n then return "Candy1_" .. tonumber(n) end
-    return "Candy1_" .. idx
-end
-
-local function candyValue(part)
-    for _, a in ipairs({"Value","Worth","Price","CandyValue","Rarity","Points","Amount","Cost","Tier"}) do
-        local v = part:GetAttribute(a)
-        if type(v) == "number" then return v end
-    end
-    for _, c in ipairs(part:GetChildren()) do
-        if c:IsA("NumberValue") or c:IsA("IntValue") then return c.Value end
-    end
-    local n = part.Name:match("(%d+)")
-    if n then return tonumber(n) end
-    return 0
-end
-
-local function dropoffPad()
-    return DROPOFF:IsA("BasePart") and DROPOFF or DROPOFF:FindFirstChildWhichIsA("BasePart")
-end
-
-local function setAuto(v)
-    env.auto = v
-    autoButton.Text = "AUTO: " .. (v and "ON" or "OFF")
-    autoButton.BackgroundColor3 = v and Color3.fromRGB(0,150,80) or Color3.fromRGB(70,40,40)
-    setFlying(v)
-    if not v then
-        task.spawn(function()
-            task.wait(0.4)
-            if not env.auto then
-                local hrp = charHRP()
-                if hrp then hrp.Anchored = false end
-                local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
-                if hum then hum.WalkSpeed = env._origWalk or 16 end
-            end
-        end)
-    end
-end
-autoButton.MouseButton1Click:Connect(function() setAuto(not env.auto) end)
-
-local function refreshModeButton()
-    modeButton.Text = (env.mode == "value") and "ORDER: MOST VALUABLE" or "ORDER: NEAREST TO DROPOFF"
-end
-modeButton.MouseButton1Click:Connect(function()
-    env.mode = (env.mode == "value") and "near" or "value"
-    refreshModeButton()
-end)
-
-plr.CharacterAdded:Connect(function()
-    task.wait(0.5)
-    if env.auto then setFlying(true) end
-end)
-
--- ===================== ciclo =====================
+-- ===================== HALLOWEEN CYCLE =====================
 task.spawn(function()
     while env._menuId == myId do
         if env.auto then
@@ -680,4 +576,4 @@ env._menuCleanup = function()
     screenGui:Destroy()
 end
 
-print("Halloween event | by Vince loaded.")
+print("[Menu Halloween v10 | Sidebar & Auto Dip Version] loaded.")
