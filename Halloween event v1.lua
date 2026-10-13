@@ -1,5 +1,5 @@
 --[[=====================================================
-    MENU HALLOWEEN v17 by Vince (Dynamic Ranch Finder)
+    MENU HALLOWEEN v18 by Vince (Instant Prompts & Dynamic Dip)
 =====================================================]]
 
 local Players      = game:GetService("Players")
@@ -72,7 +72,6 @@ end
 
 -- ===================== DYNAMIC RANCH FINDER =====================
 local function getPlayerRanchCoords()
-    -- Scans the entire workspace for the Data -> Owner structure
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj.Name == "Data" and obj.Parent then
             local ownerVal = obj:FindFirstChild("Owner")
@@ -133,11 +132,33 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
                 if dipRemote then 
                     dipRemote:FireServer() 
-                    sendNotification("Auto Dip", "Egg dipped in magma! Waiting...")
+                    sendNotification("Auto Dip", "Egg dipped! Waiting for process to finish...")
                 end
                 
-                -- 2. Wait 3.5 seconds
-                task.wait(3.5)
+                -- 2. DYNAMIC WAIT: Wait for the process to physically finish
+                task.wait(1) -- Buffer for server to start the dip
+                local timeout = 0
+                while timeout < 100 do -- Max 10 second timeout fallback
+                    task.wait(0.1)
+                    timeout = timeout + 1
+                    
+                    local isAnchored = hrp.Anchored
+                    local hasEggEquipped = false
+                    if plr.Character then
+                        for _, child in ipairs(plr.Character:GetChildren()) do
+                            if child:IsA("Tool") or child.Name:lower():find("egg") then
+                                hasEggEquipped = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    -- If character is free to move and has no egg tool, the process is done
+                    if not isAnchored and not hasEggEquipped then
+                        break 
+                    end
+                end
+                task.wait(0.5) -- Tiny safety buffer before teleporting away
                 
                 -- 3. Teleport to Food Stalls
                 hrp = charHRP()
@@ -149,7 +170,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     local ranchPos = getPlayerRanchCoords()
                     if ranchPos then
                         sendNotification("Auto Dip Sequence", "Flying back to your Ranch!")
-                        -- Add +15 to Y-axis so you don't glitch into the ground
                         slowFlyTo(ranchPos + Vector3.new(0, 15, 0)) 
                     else
                         sendNotification("Auto Dip Sequence", "Could not find your ranch! Staying at food stalls.")
@@ -177,7 +197,7 @@ toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.fromOffset(420, 340)
+mainFrame.Size = UDim2.fromOffset(420, 360) -- Slightly taller for moved button
 mainFrame.Position = UDim2.new(0, 20, 0, 80)
 mainFrame.BackgroundColor3 = C_BG
 mainFrame.BorderSizePixel = 0; mainFrame.Active = true; mainFrame.Draggable = true
@@ -245,15 +265,16 @@ local halloweenFrame = Instance.new("Frame")
 halloweenFrame.Size = UDim2.new(1, 0, 1, 0); halloweenFrame.BackgroundTransparency = 1
 halloweenFrame.Parent = contentArea
 
-local autoButton = createButton(halloweenFrame, "AUTO FARM: OFF", 15, 45, 14)
-local modeButton = createButton(halloweenFrame, "ORDER: NEAREST", 70, 32, 11)
-local moveButton = createButton(halloweenFrame, "MOVEMENT: FLY", 110, 32, 11)
-local caveButton = createButton(halloweenFrame, "OPEN CAVE: OFF", 150, 32, 11)
-local speedButton = createButton(halloweenFrame, "SPEED: NORMAL", 190, 32, 11)
+local autoButton = createButton(halloweenFrame, "AUTO FARM: OFF", 10, 40, 14)
+local autoBuyBtn = createButton(halloweenFrame, "BUY SHOP EGG: OFF", 55, 40, 12) -- MOVED HERE
+local modeButton = createButton(halloweenFrame, "ORDER: NEAREST", 100, 30, 11)
+local moveButton = createButton(halloweenFrame, "MOVEMENT: FLY", 135, 30, 11)
+local caveButton = createButton(halloweenFrame, "OPEN CAVE: OFF", 170, 30, 11)
+local speedButton = createButton(halloweenFrame, "SPEED: NORMAL", 205, 30, 11)
 speedButton.BackgroundColor3 = Color3.fromRGB(55, 65, 85) 
 
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -20, 0, 40); statusLabel.Position = UDim2.new(0, 10, 0, 235)
+statusLabel.Size = UDim2.new(1, -20, 0, 40); statusLabel.Position = UDim2.new(0, 10, 0, 240)
 statusLabel.BackgroundTransparency = 1; statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
 statusLabel.Font = Enum.Font.Gotham; statusLabel.TextSize = 11
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left; statusLabel.TextYAlignment = Enum.TextYAlignment.Top
@@ -273,15 +294,14 @@ local eggFrame = Instance.new("Frame")
 eggFrame.Size = UDim2.new(1, 0, 1, 0); eggFrame.BackgroundTransparency = 1
 eggFrame.Visible = false; eggFrame.Parent = contentArea
 
-local autoBuyBtn = createButton(eggFrame, "BUY SHOP EGG: OFF", 15, 40, 12)
-local autoEggBtn = createButton(eggFrame, "CLAIM MAP EGG", 65, 40, 12)
-local refreshEggsBtn = createButton(eggFrame, "SCAN FOR EGGS", 115, 30, 11)
+local autoEggBtn = createButton(eggFrame, "CLAIM MAP EGG", 10, 40, 14)
+local refreshEggsBtn = createButton(eggFrame, "SCAN FOR EGGS", 55, 30, 11)
 refreshEggsBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
-local dropdownBtn = createButton(eggFrame, "Target: None ▼", 155, 30, 11)
+local dropdownBtn = createButton(eggFrame, "Target: None ▼", 90, 30, 11)
 dropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
 
 local eggScrollList = Instance.new("ScrollingFrame")
-eggScrollList.Size = UDim2.new(1, -20, 0, 110); eggScrollList.Position = UDim2.new(0, 10, 0, 185)
+eggScrollList.Size = UDim2.new(1, -20, 0, 120); eggScrollList.Position = UDim2.new(0, 10, 0, 125)
 eggScrollList.BackgroundColor3 = C_SIDEBAR; eggScrollList.BorderSizePixel = 0
 eggScrollList.ScrollBarThickness = 4; eggScrollList.Visible = false
 eggScrollList.Parent = eggFrame
@@ -354,7 +374,7 @@ tabHalloweenBtn.MouseButton1Click:Connect(function() switchTab("Halloween") end)
 tabTeleportBtn.MouseButton1Click:Connect(function() switchTab("Teleports") end)
 tabEggBtn.MouseButton1Click:Connect(function() switchTab("Auto Egg") end)
 
--- ===================== FLYING & MOVEMENT =====================
+-- ===================== FLYING & PROMPT UTIL =====================
 local function setCollide(collide)
     local char = plr.Character
     if not char then return end
@@ -397,11 +417,36 @@ local function updateFlyingState()
     end
 end
 
+-- UPGRADED: Instantly triggers prompts regardless of UI cover or camera angle
 local function triggerPrompt(prompt)
     if not prompt or not prompt.Enabled then return false end
-    prompt:InputHoldBegin()
-    task.wait(math.max(prompt.HoldDuration, 0.05) + 0.05)
-    prompt:InputHoldEnd()
+    
+    -- Attempt 1: Exploit Native Function (Instantly fires it without holding)
+    if fireproximityprompt then
+        pcall(fireproximityprompt, prompt, 1, true)
+        return true
+    end
+    
+    -- Attempt 2: Fallback (Forces the prompt to require 0 time and ignore UI/Line of Sight)
+    local oldLOS = prompt.RequiresLineOfSight
+    local oldDur = prompt.HoldDuration
+    local oldMax = prompt.MaxActivationDistance
+    
+    prompt.RequiresLineOfSight = false
+    prompt.HoldDuration = 0
+    prompt.MaxActivationDistance = 100
+    
+    pcall(function()
+        prompt:InputHoldBegin()
+        task.wait(0.05)
+        prompt:InputHoldEnd()
+    end)
+    
+    -- Restore original properties
+    prompt.RequiresLineOfSight = oldLOS
+    prompt.HoldDuration = oldDur
+    prompt.MaxActivationDistance = oldMax
+    
     return true
 end
 
@@ -675,6 +720,8 @@ task.spawn(function()
                     for attempt = 1, 4 do
                         if not env.auto or env._menuId ~= myId then break end
                         local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
+                        
+                        -- Upgraded trigger runs here
                         if not triggerPrompt(prompt) then triggerPromptsNear(part.Position, 8) end
                         
                         if id ~= "Yin" and id ~= "Yang" then CollectCandy:FireServer(id)
@@ -715,4 +762,4 @@ env._menuCleanup = function()
     screenGui:Destroy()
 end
 
-print("[Menu Halloween v17 | Dynamic Ranch Finder] loaded.")
+print("[Menu Halloween v18 | Instant Prompts & Dynamic Dip] loaded.")
