@@ -132,19 +132,19 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
                 if dipRemote then 
                     dipRemote:FireServer() 
-                    sendNotification("Auto Dip", "Egg dipped! Waiting 5 seconds...")
+                    sendNotification("Auto Dip", "Egg dipped! Waiting 10 seconds...")
                 end
                 
-                -- 2. STRICT WAIT: 5 seconds after dipping
-                task.wait(8)
+                -- 2. STRICT WAIT: 10 seconds after dipping
+                task.wait(10)
                 
                 -- 3. Teleport to Food Stalls
                 hrp = charHRP()
                 if hrp then
                     hrp.CFrame = CFrame.new(FOOD_STALL_COORDS)
-                    sendNotification("Auto Dip Sequence", "At Food Stalls. Waiting 3 seconds...")
+                    sendNotification("Auto Dip Sequence", "At Food Stalls. Waiting 5 seconds...")
                     
-                    -- 4. STRICT WAIT: 3 seconds at food stalls
+                    -- 4. STRICT WAIT: 5 seconds at food stalls
                     task.wait(5)
                     
                     -- 5. Fly to Ranch
