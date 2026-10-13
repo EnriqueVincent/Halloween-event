@@ -1,5 +1,5 @@
 --[[=====================================================
-    MENU HALLOWEEN v14 by Vince (Modern UI & Speed Presets)
+    MENU HALLOWEEN v17 by Vince (Dynamic Ranch Finder)
 =====================================================]]
 
 local Players      = game:GetService("Players")
@@ -14,8 +14,8 @@ local CollectCandy = GameRemotes:WaitForChild("CollectCandy")
 local CANDY_FOLDER = workspace:WaitForChild("HalloweenCandy")
 local DROPOFF      = workspace:WaitForChild("CandyDropOff")
 
--- [ VOLCANO COORDINATES ]
-local VOLCANO_COORDS = Vector3.new(-5109.14, 41435.2, -3472.42) 
+-- [ FIXED COORDINATES ]
+local VOLCANO_COORDS    = Vector3.new(-5109.14, 41435.2, -3472.42) 
 local FOOD_STALL_COORDS = Vector3.new(125.546, 40322.6, 948.211)
 
 local DepositRemote
@@ -52,7 +52,7 @@ env.speed = speeds[currentSpeedIdx].value
 -- UI COLORS (Modern Theme)
 local C_BG = Color3.fromRGB(20, 20, 25)
 local C_SIDEBAR = Color3.fromRGB(28, 28, 35)
-local C_ACCENT = Color3.fromRGB(255, 120, 0) -- Halloween Orange
+local C_ACCENT = Color3.fromRGB(255, 120, 0)
 local C_BTN_OFF = Color3.fromRGB(45, 45, 55)
 local C_BTN_ON = C_ACCENT
 local C_TEXT = Color3.fromRGB(240, 240, 240)
@@ -70,15 +70,62 @@ local function sendNotification(title, text)
     end)
 end
 
+-- ===================== DYNAMIC RANCH FINDER =====================
+local function getPlayerRanchCoords()
+    -- Scans the entire workspace for the Data -> Owner structure
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "Data" and obj.Parent then
+            local ownerVal = obj:FindFirstChild("Owner")
+            if ownerVal and tostring(ownerVal.Value) == plr.Name then
+                local plot = obj.Parent
+                if plot:IsA("Model") then
+                    return plot:GetPivot().Position
+                else
+                    local firstPart = plot:FindFirstChildWhichIsA("BasePart", true)
+                    if firstPart then return firstPart.Position end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- ===================== SLOW FLY TO RANCH =====================
+local function slowFlyTo(dest)
+    local hrp = charHRP()
+    if not hrp then return end
+    hrp.Anchored = true
+    local start = hrp.Position
+    local total = (dest - start).Magnitude
+    if total >= 2 then
+        local travelled, guard = 0, 0
+        local slowSpeed = 45 -- Slow, cinematic speed
+        while env._menuId == myId and guard < 5000 do
+            local dt = RunService.Heartbeat:Wait()
+            guard += 1
+            travelled = math.min(travelled + slowSpeed * dt, total)
+            local prog = travelled / total
+            local base = start:Lerp(dest, prog)
+            local arc  = math.sin(prog * math.pi) * env.arc
+            hrp.CFrame = CFrame.new(base + Vector3.new(0, arc, 0))
+            if prog >= 1 then break end
+        end
+    end
+    hrp.CFrame = CFrame.new(dest)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.Anchored = false
+end
+
 -- ===================== EGG PICKUP HOOK =====================
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-    if method == "FireServer" and tostring(self) == "EggPickup" and env.autoDip then
+    if method == "FireServer" and typeof(self) == "Instance" and self.Name == "EggPickup" and env.autoDip then
         task.spawn(function()
             task.wait(0.4) 
             local hrp = charHRP()
             if hrp then
+                -- 1. Teleport to Volcano & Dip
                 hrp.CFrame = CFrame.new(VOLCANO_COORDS)
                 task.wait(0.6) 
                 local dipRemote = RS:FindFirstChild("packages") 
@@ -86,7 +133,27 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                     and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
                 if dipRemote then 
                     dipRemote:FireServer() 
-                    sendNotification("Auto Dip", "Successfully dipped egg in magma!")
+                    sendNotification("Auto Dip", "Egg dipped in magma! Waiting...")
+                end
+                
+                -- 2. Wait 3.5 seconds
+                task.wait(3.5)
+                
+                -- 3. Teleport to Food Stalls
+                hrp = charHRP()
+                if hrp then
+                    hrp.CFrame = CFrame.new(FOOD_STALL_COORDS)
+                    task.wait(0.6)
+                    
+                    -- 4. Dynamically find ranch and fly to it
+                    local ranchPos = getPlayerRanchCoords()
+                    if ranchPos then
+                        sendNotification("Auto Dip Sequence", "Flying back to your Ranch!")
+                        -- Add +15 to Y-axis so you don't glitch into the ground
+                        slowFlyTo(ranchPos + Vector3.new(0, 15, 0)) 
+                    else
+                        sendNotification("Auto Dip Sequence", "Could not find your ranch! Staying at food stalls.")
+                    end
                 end
             end
         end)
@@ -99,10 +166,6 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HalloweenMenu"; screenGui.ResetOnSpawn = false
 screenGui.Parent = plr:WaitForChild("PlayerGui")
 
--- [ TOGGLE BUTTON ]
--- If you want to use an image instead of a plain box, change `Instance.new("TextButton")` 
--- to `Instance.new("ImageButton")` and set its `.Image` property to your Roblox Asset ID.
--- Example: toggleBtn.Image = "rbxassetid://1234567890"
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.fromOffset(45, 45)
 toggleBtn.Position = UDim2.new(0, 20, 0, 20)
@@ -113,7 +176,6 @@ toggleBtn.BorderSizePixel = 0
 toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
 
--- [ MAIN FRAME ]
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.fromOffset(420, 340)
 mainFrame.Position = UDim2.new(0, 20, 0, 80)
@@ -126,7 +188,6 @@ toggleBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = not mainFrame.Visible
 end)
 
--- Title
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 36); titleLabel.BorderSizePixel = 0
 titleLabel.BackgroundColor3 = C_ACCENT
@@ -142,7 +203,6 @@ titleBlock.Size = UDim2.new(1, 0, 0, 10); titleBlock.Position = UDim2.new(0, 0, 
 titleBlock.BackgroundColor3 = C_ACCENT; titleBlock.BorderSizePixel = 0
 titleBlock.Parent = titleLabel
 
--- ===================== SIDEBAR =====================
 local sidebar = Instance.new("Frame")
 sidebar.Size = UDim2.new(0, 120, 1, -36); sidebar.Position = UDim2.new(0, 0, 0, 36)
 sidebar.BackgroundColor3 = C_SIDEBAR; sidebar.BorderSizePixel = 0
@@ -163,13 +223,12 @@ local tabHalloweenBtn = createTabButton("Halloween", 10)
 local tabTeleportBtn = createTabButton("Teleports", 55)
 local tabEggBtn = createTabButton("Auto Egg", 100)
 
-tabHalloweenBtn.BackgroundColor3 = C_BTN_OFF -- Set first tab as active
+tabHalloweenBtn.BackgroundColor3 = C_BTN_OFF 
 
 local contentArea = Instance.new("Frame")
 contentArea.Size = UDim2.new(1, -120, 1, -36); contentArea.Position = UDim2.new(0, 120, 0, 36)
 contentArea.BackgroundTransparency = 1; contentArea.Parent = mainFrame
 
--- Function to create modern buttons
 local function createButton(parent, text, yPos, height, fontSize)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, height or 35); btn.Position = UDim2.new(0, 10, 0, yPos)
@@ -191,7 +250,7 @@ local modeButton = createButton(halloweenFrame, "ORDER: NEAREST", 70, 32, 11)
 local moveButton = createButton(halloweenFrame, "MOVEMENT: FLY", 110, 32, 11)
 local caveButton = createButton(halloweenFrame, "OPEN CAVE: OFF", 150, 32, 11)
 local speedButton = createButton(halloweenFrame, "SPEED: NORMAL", 190, 32, 11)
-speedButton.BackgroundColor3 = Color3.fromRGB(55, 65, 85) -- Distinct color for speed
+speedButton.BackgroundColor3 = Color3.fromRGB(55, 65, 85) 
 
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 40); statusLabel.Position = UDim2.new(0, 10, 0, 235)
@@ -215,7 +274,7 @@ eggFrame.Size = UDim2.new(1, 0, 1, 0); eggFrame.BackgroundTransparency = 1
 eggFrame.Visible = false; eggFrame.Parent = contentArea
 
 local autoBuyBtn = createButton(eggFrame, "BUY SHOP EGG: OFF", 15, 40, 12)
-local autoEggBtn = createButton(eggFrame, "CLAIM MAP EGG: OFF", 65, 40, 12)
+local autoEggBtn = createButton(eggFrame, "CLAIM MAP EGG", 65, 40, 12)
 local refreshEggsBtn = createButton(eggFrame, "SCAN FOR EGGS", 115, 30, 11)
 refreshEggsBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
 local dropdownBtn = createButton(eggFrame, "Target: None ▼", 155, 30, 11)
@@ -280,7 +339,7 @@ refreshEggsBtn.MouseButton1Click:Connect(function()
 end)
 populateEggList()
 
--- ===================== TAB SWITCHING LOGIC =====================
+-- ===================== TAB SWITCHING =====================
 local function switchTab(tabName)
     halloweenFrame.Visible = (tabName == "Halloween")
     teleportFrame.Visible = (tabName == "Teleports")
@@ -295,7 +354,7 @@ tabHalloweenBtn.MouseButton1Click:Connect(function() switchTab("Halloween") end)
 tabTeleportBtn.MouseButton1Click:Connect(function() switchTab("Teleports") end)
 tabEggBtn.MouseButton1Click:Connect(function() switchTab("Auto Egg") end)
 
--- ===================== FLYING & MOVEMENT UTIL =====================
+-- ===================== FLYING & MOVEMENT =====================
 local function setCollide(collide)
     local char = plr.Character
     if not char then return end
@@ -323,12 +382,12 @@ local function setFlying(state)
 end
 
 local function updateFlyingState()
-    local shouldFly = env.auto or env.autoEgg
+    local shouldFly = env.auto
     setFlying(shouldFly)
     if not shouldFly then
         task.spawn(function()
             task.wait(0.4)
-            if not (env.auto or env.autoEgg) then
+            if not env.auto then
                 local hrp = charHRP()
                 if hrp then hrp.Anchored = false end
                 local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
@@ -368,14 +427,14 @@ local function flyTo(dest)
         hrp.CFrame = CFrame.new(dest)
         hrp.AssemblyLinearVelocity = Vector3.zero
         task.wait(0.5) 
-        if (env.auto or env.autoEgg) and env._menuId == myId then hrp.Anchored = true end
+        if env.auto and env._menuId == myId then hrp.Anchored = true end
     else
         hrp.Anchored = true
         local start = hrp.Position
         local total = (dest - start).Magnitude
         if total >= 2 then
             local travelled, guard = 0, 0
-            while (env.auto or env.autoEgg) and env._menuId == myId and guard < 5000 do
+            while env.auto and env._menuId == myId and guard < 5000 do
                 local dt = RunService.Heartbeat:Wait()
                 guard += 1
                 travelled = math.min(travelled + env.speed * dt, total)
@@ -390,7 +449,7 @@ local function flyTo(dest)
         hrp.AssemblyLinearVelocity = Vector3.zero
         hrp.Anchored = false
         task.wait(0.15)
-        if (env.auto or env.autoEgg) and env._menuId == myId then hrp.Anchored = true end
+        if env.auto and env._menuId == myId then hrp.Anchored = true end
         task.wait(0.05)
     end
 end
@@ -419,10 +478,16 @@ autoBuyBtn.MouseButton1Click:Connect(function()
 end)
 
 autoEggBtn.MouseButton1Click:Connect(function()
-    env.autoEgg = not env.autoEgg
-    autoEggBtn.Text = "CLAIM MAP EGG: " .. (env.autoEgg and "ON" or "OFF")
-    autoEggBtn.BackgroundColor3 = env.autoEgg and C_BTN_ON or C_BTN_OFF
-    updateFlyingState()
+    if not env.targetEgg or env.targetEgg == "No Eggs Spawned" then
+        autoEggBtn.Text = "SELECT TARGET ▼ FIRST!"
+        task.wait(1.5)
+        autoEggBtn.Text = "CLAIM MAP EGG"
+        return
+    end
+    
+    env.autoEgg = true
+    autoEggBtn.Text = "CLAIMING..."
+    autoEggBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
 end)
 
 moveButton.MouseButton1Click:Connect(function()
@@ -506,9 +571,58 @@ end)
 -- ===================== MAIN CYCLE =====================
 task.spawn(function()
     while env._menuId == myId do
-        if env.auto or env.autoEgg then
+        
+        -- [1] AUTO EGG MACRO (ONE TIME TRIGGER)
+        if env.autoEgg and env.targetEgg then
+            local renderedEggs = workspace:FindFirstChild("RenderedEggs")
+            local eggFound = false
             
-            -- [1] AUTO CAVE LOGIC
+            if renderedEggs then
+                for _, egg in ipairs(renderedEggs:GetChildren()) do
+                    if not env.autoEgg or env._menuId ~= myId then break end
+                    
+                    if egg:IsA("Model") and egg.Name == env.targetEgg then
+                        eggFound = true
+                        local targetPos = egg:GetPivot().Position
+                        local prompt = egg:FindFirstChildWhichIsA("ProximityPrompt", true)
+                        
+                        if prompt and targetPos then
+                            statusLabel.Text = "Status: Teleporting to " .. egg.Name
+                            
+                            local hrp = charHRP()
+                            if hrp then 
+                                hrp.Anchored = false
+                                hrp.CFrame = CFrame.new(targetPos) 
+                                hrp.AssemblyLinearVelocity = Vector3.zero
+                            end
+                            task.wait(0.5)
+                            
+                            triggerPrompt(prompt)
+                            
+                            local timeout = 0
+                            while egg.Parent and timeout < 30 do
+                                task.wait(0.1)
+                                timeout = timeout + 1
+                            end
+                        end
+                        break
+                    end
+                end
+            end
+            
+            env.autoEgg = false
+            autoEggBtn.Text = "CLAIM MAP EGG"
+            autoEggBtn.BackgroundColor3 = C_BTN_OFF
+            
+            if not eggFound then
+                statusLabel.Text = "Status: Egg not found!"
+                task.wait(2)
+            end
+        end
+
+        -- [2] AUTO CANDY FARMING
+        if env.auto then
+            
             if env.autoCave then
                 local caveDoor
                 for _, p in ipairs(workspace:GetDescendants()) do
@@ -526,96 +640,69 @@ task.spawn(function()
                 end
             end
             
-            -- [2] AUTO EGG LOGIC
-            if env.autoEgg and env.targetEgg then
-                local renderedEggs = workspace:FindFirstChild("RenderedEggs")
-                if renderedEggs then
-                    for _, egg in ipairs(renderedEggs:GetChildren()) do
-                        if not env.autoEgg or env._menuId ~= myId then break end
-                        
-                        if egg:IsA("Model") and egg.Name == env.targetEgg then
-                            local targetPos = egg:GetPivot().Position
-                            local prompt = egg:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            
-                            if prompt and targetPos then
-                                statusLabel.Text = "Status: Flying to " .. egg.Name
-                                flyTo(targetPos)
-                                task.wait(0.2)
-                                triggerPrompt(prompt)
-                                task.wait(0.8)
-                            end
-                        end
-                    end
-                end
+            local candies = {}
+            for _, p in ipairs(CANDY_FOLDER:GetChildren()) do
+                if p:IsA("BasePart") then candies[#candies+1] = p end
+            end
+            for _, p in ipairs(workspace:GetDescendants()) do
+                if p:IsA("BasePart") and (p.Name == "Yin" or p.Name == "Yang") then candies[#candies+1] = p end
             end
 
-            -- [3] AUTO CANDY LOGIC
-            if env.auto then
-                local candies = {}
-                for _, p in ipairs(CANDY_FOLDER:GetChildren()) do
-                    if p:IsA("BasePart") then candies[#candies+1] = p end
-                end
-                for _, p in ipairs(workspace:GetDescendants()) do
-                    if p:IsA("BasePart") and (p.Name == "Yin" or p.Name == "Yang") then candies[#candies+1] = p end
+            if #candies == 0 then
+                statusLabel.Text = "Status: No candy, waiting..."
+                task.wait(0.5)
+            else
+                if env.mode == "value" then
+                    table.sort(candies, function(a, b)
+                        local function getVal(part) return (part.Name == "Yin" or part.Name == "Yang") and 9999999 or candyValue(part) end
+                        return getVal(a) > getVal(b)
+                    end)
+                else
+                    local pad = dropoffPad()
+                    if pad then
+                        table.sort(candies, function(a, b) return (a.Position - pad.Position).Magnitude < (b.Position - pad.Position).Magnitude end)
+                    end
                 end
 
-                if #candies == 0 then
-                    statusLabel.Text = "Status: No candy, waiting..."
-                    task.wait(0.5)
-                else
-                    if env.mode == "value" then
-                        table.sort(candies, function(a, b)
-                            local function getVal(part) return (part.Name == "Yin" or part.Name == "Yang") and 9999999 or candyValue(part) end
-                            return getVal(a) > getVal(b)
-                        end)
-                    else
+                for i, part in ipairs(candies) do
+                    if not env.auto or env._menuId ~= myId then break end
+
+                    local id = part.Name == "Yin" and "Yin" or part.Name == "Yang" and "Yang" or candyId(part, i)                    
+                    statusLabel.Text = "Status: Flying to " .. id
+                    flyTo(part.Position)
+                    task.wait(0.15)
+
+                    for attempt = 1, 4 do
+                        if not env.auto or env._menuId ~= myId then break end
+                        local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
+                        if not triggerPrompt(prompt) then triggerPromptsNear(part.Position, 8) end
+                        
+                        if id ~= "Yin" and id ~= "Yang" then CollectCandy:FireServer(id)
+                        else if attempt == 1 then sendNotification("🔮 Sigil Sniper", "Successfully collected the " .. id .. " sigil!") end end
+                        
+                        task.wait(0.3)
+                        if part.Parent ~= CANDY_FOLDER and part.Parent ~= workspace then break end
+                    end
+
+                    if env.auto and id ~= "Yin" and id ~= "Yang" then
                         local pad = dropoffPad()
                         if pad then
-                            table.sort(candies, function(a, b) return (a.Position - pad.Position).Magnitude < (b.Position - pad.Position).Magnitude end)
+                            statusLabel.Text = "Status: Returning to dropoff"
+                            flyTo(pad.Position)
+                            task.wait(0.2)
+                            triggerPromptsNear(pad.Position, 8)
+                            if DepositRemote then DepositRemote:FireServer() end
+                            task.wait(0.4)
                         end
                     end
-
-                    for i, part in ipairs(candies) do
-                        if not env.auto or env._menuId ~= myId then break end
-
-                        local id = part.Name == "Yin" and "Yin" or part.Name == "Yang" and "Yang" or candyId(part, i)                    
-                        statusLabel.Text = "Status: Flying to " .. id
-                        flyTo(part.Position)
-                        task.wait(0.15)
-
-                        for attempt = 1, 4 do
-                            if not env.auto or env._menuId ~= myId then break end
-                            local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if not triggerPrompt(prompt) then triggerPromptsNear(part.Position, 8) end
-                            
-                            if id ~= "Yin" and id ~= "Yang" then CollectCandy:FireServer(id)
-                            else if attempt == 1 then sendNotification("🔮 Sigil Sniper", "Successfully collected the " .. id .. " sigil!") end end
-                            
-                            task.wait(0.3)
-                            if part.Parent ~= CANDY_FOLDER and part.Parent ~= workspace then break end
-                        end
-
-                        if env.auto and id ~= "Yin" and id ~= "Yang" then
-                            local pad = dropoffPad()
-                            if pad then
-                                statusLabel.Text = "Status: Returning to dropoff"
-                                flyTo(pad.Position)
-                                task.wait(0.2)
-                                triggerPromptsNear(pad.Position, 8)
-                                if DepositRemote then DepositRemote:FireServer() end
-                                task.wait(0.4)
-                            end
-                        end
-                    end
-                    task.wait(0.1)
                 end
-            else
-                if not env.autoEgg then statusLabel.Text = "Status: Idle."; task.wait(0.3) end
+                task.wait(0.1)
             end
         else
-            statusLabel.Text = "Status: Idle."
-            task.wait(0.3)
+            if not env.autoEgg then statusLabel.Text = "Status: Idle." end
         end
+        
+        task.wait(0.1)
     end
 end)
 
@@ -628,4 +715,4 @@ env._menuCleanup = function()
     screenGui:Destroy()
 end
 
-print("[Menu Halloween v14 | Modern UI + Speed Settings] loaded.")
+print("[Menu Halloween v17 | Dynamic Ranch Finder] loaded.")
