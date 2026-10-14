@@ -1,11 +1,12 @@
 --[[=====================================================
-    MENU HALLOWEEN v23 by Vince (Volcanic Egg Infiltration)
+    MENU HALLOWEEN v24 by Vince (Dual Egg Lists & Anti-AFK)
 =====================================================]]
 
 local Players      = game:GetService("Players")
 local RS           = game:GetService("ReplicatedStorage")
 local RunService   = game:GetService("RunService")
 local UIS          = game:GetService("UserInputService")
+local VirtualUser  = game:GetService("VirtualUser")
 
 local plr = Players.LocalPlayer
 local GameRemotes  = RS:WaitForChild("Remotes"):WaitForChild("Game")
@@ -46,7 +47,13 @@ env.autoVolcanicEgg = false
 env.autoBuyEgg      = false
 env.targetEggs      = {} 
 env.isDipping       = false
-env.suppressDipHook = false -- Prevents the namecall hook from interfering with custom sequences
+env.suppressDipHook = false 
+
+-- ALL KNOWN EGGS (Master Target List)
+local KNOWN_EGGS = {
+    "Asteroid Egg", "Brown Egg", "Cherub Egg", "Halloween Egg", 
+    "Solaris Egg", "Volcanic Egg", "Blue Egg", "Green Egg", "Red Egg"
+}
 
 -- SPEED SETTINGS
 local speeds = {
@@ -73,11 +80,38 @@ end
 
 local function sendNotification(title, text)
     pcall(function()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = title, Text = text, Duration = 5
-        })
+        game.StarterGui:SetCore("SendNotification", {Title = title, Text = text, Duration = 5})
     end)
 end
+
+-- ===================== ANTI-AFK SYSTEM =====================
+-- 1. Native Roblox Backup
+plr.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
+
+-- 2. 10-Minute Screen Clicker
+local idleSeconds = 0
+UIS.InputBegan:Connect(function() idleSeconds = 0 end)
+UIS.InputChanged:Connect(function() idleSeconds = 0 end)
+
+task.spawn(function()
+    while env._menuId == myId do
+        task.wait(1)
+        idleSeconds = idleSeconds + 1
+        if idleSeconds >= 600 then -- 10 Minutes = 600 seconds
+            local cam = workspace.CurrentCamera
+            if cam then
+                local midX, midY = cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2
+                VirtualUser:Button1Down(Vector2.new(midX, midY))
+                task.wait(0.05)
+                VirtualUser:Button1Up(Vector2.new(midX, midY))
+            end
+        end
+    end
+end)
 
 -- ===================== DYNAMIC RANCH FINDER =====================
 local function getPlayerRanchCoords()
@@ -134,33 +168,20 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             task.wait(0.4) 
             local hrp = charHRP()
             if hrp then
-                -- 1. Teleport to Volcano & Dip
                 hrp.CFrame = CFrame.new(VOLCANO_COORDS)
                 task.wait(0.6) 
-                local dipRemote = RS:FindFirstChild("packages") 
-                    and RS.packages:FindFirstChild("Net") 
-                    and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
-                if dipRemote then 
-                    dipRemote:FireServer() 
-                    sendNotification("Auto Dip", "Egg dipped! Waiting 10 seconds...")
-                end
+                local dipRemote = RS:FindFirstChild("packages") and RS.packages:FindFirstChild("Net") and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
+                if dipRemote then dipRemote:FireServer() end
                 
-                -- 2. Wait 10 seconds
                 task.wait(10)
                 
-                -- 3. Teleport to Food Stalls
                 hrp = charHRP()
                 if hrp then
                     hrp.CFrame = CFrame.new(FOOD_STALL_COORDS)
-                    sendNotification("Auto Dip Sequence", "At Food Stalls. Waiting 5 seconds...")
-                    
-                    -- 4. Wait 5 seconds
                     task.wait(5)
                     
-                    -- 5. Fly to Ranch
                     local ranchPos = getPlayerRanchCoords()
                     if ranchPos then
-                        sendNotification("Auto Dip Sequence", "Flying back to your Ranch!")
                         slowFlyTo(ranchPos + Vector3.new(0, 15, 0)) 
                         task.wait(1)
                     end
@@ -188,7 +209,7 @@ toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.fromOffset(420, 370)
+mainFrame.Size = UDim2.fromOffset(420, 390)
 mainFrame.Position = UDim2.new(0, 20, 0, 80)
 mainFrame.BackgroundColor3 = C_BG
 mainFrame.BorderSizePixel = 0; mainFrame.Active = true; mainFrame.Draggable = true
@@ -287,28 +308,80 @@ local autoFarmEggBtn = createButton(eggFrame, "AUTO FARM EGGS: OFF", 10, 30, 12)
 local autoEggMacroBtn = createButton(eggFrame, "CLAIM MAP EGG (ONCE)", 45, 30, 12)
 local autoVolcanicBtn = createButton(eggFrame, "AUTO VOLCANIC EGG: OFF", 80, 30, 12)
 
-local refreshEggsBtn = createButton(eggFrame, "SCAN MAP FOR EGGS", 115, 25, 11)
+-- Dropdown 1: Select Best Egg (Target Multi-Select)
+local targetDropdownBtn = createButton(eggFrame, "Select best egg ▼", 115, 25, 11)
+targetDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
+
+-- Refresh Button
+local refreshEggsBtn = createButton(eggFrame, "SCAN MAP FOR EGGS", 145, 25, 11)
 refreshEggsBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
-local dropdownBtn = createButton(eggFrame, "Targets: 0 Selected ▼", 145, 25, 11)
-dropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
 
-local eggScrollList = Instance.new("ScrollingFrame")
-eggScrollList.Size = UDim2.new(1, -20, 0, 140); eggScrollList.Position = UDim2.new(0, 10, 0, 175)
-eggScrollList.BackgroundColor3 = C_SIDEBAR; eggScrollList.BorderSizePixel = 0
-eggScrollList.ScrollBarThickness = 4; eggScrollList.Visible = false
-eggScrollList.Parent = eggFrame
-Instance.new("UICorner", eggScrollList).CornerRadius = UDim.new(0, 6)
+-- Dropdown 2: Spawned Monitor (Read-Only)
+local spawnedDropdownBtn = createButton(eggFrame, "Spawned Monitor ▼", 175, 25, 11)
+spawnedDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
 
-local eggListLayout = Instance.new("UIListLayout")
-eggListLayout.Parent = eggScrollList
-eggListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-eggListLayout.Padding = UDim.new(0, 2)
+-- TARGET SCROLL LIST (High Z-Index so it overlaps everything)
+local targetScrollList = Instance.new("ScrollingFrame")
+targetScrollList.Size = UDim2.new(1, -20, 0, 130); targetScrollList.Position = UDim2.new(0, 10, 0, 145)
+targetScrollList.BackgroundColor3 = C_SIDEBAR; targetScrollList.BorderSizePixel = 0
+targetScrollList.ScrollBarThickness = 4; targetScrollList.Visible = false; targetScrollList.ZIndex = 10
+targetScrollList.Parent = eggFrame
+Instance.new("UICorner", targetScrollList).CornerRadius = UDim.new(0, 6)
+local targetListLayout = Instance.new("UIListLayout")
+targetListLayout.Parent = targetScrollList; targetListLayout.SortOrder = Enum.SortOrder.LayoutOrder; targetListLayout.Padding = UDim.new(0, 2)
 
-dropdownBtn.MouseButton1Click:Connect(function() eggScrollList.Visible = not eggScrollList.Visible end)
+-- SPAWNED SCROLL LIST
+local spawnedScrollList = Instance.new("ScrollingFrame")
+spawnedScrollList.Size = UDim2.new(1, -20, 0, 100); spawnedScrollList.Position = UDim2.new(0, 10, 0, 205)
+spawnedScrollList.BackgroundColor3 = C_SIDEBAR; spawnedScrollList.BorderSizePixel = 0
+spawnedScrollList.ScrollBarThickness = 4; spawnedScrollList.Visible = false; spawnedScrollList.ZIndex = 10
+spawnedScrollList.Parent = eggFrame
+Instance.new("UICorner", spawnedScrollList).CornerRadius = UDim.new(0, 6)
+local spawnedListLayout = Instance.new("UIListLayout")
+spawnedListLayout.Parent = spawnedScrollList; spawnedListLayout.SortOrder = Enum.SortOrder.LayoutOrder; spawnedListLayout.Padding = UDim.new(0, 2)
 
-local function populateEggList()
-    for _, child in ipairs(eggScrollList:GetChildren()) do
+-- Dropdown Logic
+targetDropdownBtn.MouseButton1Click:Connect(function() 
+    targetScrollList.Visible = not targetScrollList.Visible 
+    spawnedScrollList.Visible = false
+end)
+spawnedDropdownBtn.MouseButton1Click:Connect(function() 
+    spawnedScrollList.Visible = not spawnedScrollList.Visible 
+    targetScrollList.Visible = false
+end)
+
+local function renderTargetList()
+    for _, child in ipairs(targetScrollList:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
+    end
+    table.sort(KNOWN_EGGS)
+    for _, eggName in ipairs(KNOWN_EGGS) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -8, 0, 25); btn.ZIndex = 10
+        btn.BackgroundColor3 = table.find(env.targetEggs, eggName) and C_BTN_ON or C_SIDEBAR
+        btn.BorderSizePixel = 0; btn.TextColor3 = C_TEXT
+        btn.Font = Enum.Font.Gotham; btn.TextSize = 11; btn.Text = eggName
+        btn.Parent = targetScrollList
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        
+        btn.MouseButton1Click:Connect(function()
+            local idx = table.find(env.targetEggs, eggName)
+            if idx then
+                table.remove(env.targetEggs, idx)
+                btn.BackgroundColor3 = C_SIDEBAR
+            else
+                table.insert(env.targetEggs, eggName)
+                btn.BackgroundColor3 = C_BTN_ON
+            end
+            targetDropdownBtn.Text = "Targets: " .. #env.targetEggs .. " Selected ▼"
+        end)
+    end
+    targetScrollList.CanvasSize = UDim2.new(0, 0, 0, #KNOWN_EGGS * 27)
+end
+
+local function scanMapAndRenderSpawned()
+    for _, child in ipairs(spawnedScrollList:GetChildren()) do
+        if child:IsA("TextLabel") then child:Destroy() end
     end
     
     local foundEggs = {}
@@ -318,45 +391,38 @@ local function populateEggList()
         for _, egg in ipairs(renderedEggs:GetChildren()) do
             if egg:IsA("Model") and not table.find(foundEggs, egg.Name) then
                 table.insert(foundEggs, egg.Name)
+                -- Add to master list if it's a completely brand new egg
+                if not table.find(KNOWN_EGGS, egg.Name) then
+                    table.insert(KNOWN_EGGS, egg.Name)
+                    renderTargetList()
+                end
             end
         end
     end
     
-    if #foundEggs == 0 then table.insert(foundEggs, "No Eggs Spawned") end
+    if #foundEggs == 0 then table.insert(foundEggs, "No Eggs on Map") end
+    spawnedDropdownBtn.Text = "Spawned Monitor: " .. (#foundEggs == 1 and foundEggs[1] == "No Eggs on Map" and "0" or tostring(#foundEggs)) .. " ▼"
     
     for _, eggName in ipairs(foundEggs) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -8, 0, 25); 
-        btn.BackgroundColor3 = table.find(env.targetEggs, eggName) and C_BTN_ON or C_SIDEBAR
-        btn.BorderSizePixel = 0; btn.TextColor3 = C_TEXT
-        btn.Font = Enum.Font.Gotham; btn.TextSize = 11; btn.Text = eggName
-        btn.Parent = eggScrollList
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-        
-        btn.MouseButton1Click:Connect(function()
-            if eggName ~= "No Eggs Spawned" then
-                local idx = table.find(env.targetEggs, eggName)
-                if idx then
-                    table.remove(env.targetEggs, idx)
-                    btn.BackgroundColor3 = C_SIDEBAR
-                else
-                    table.insert(env.targetEggs, eggName)
-                    btn.BackgroundColor3 = C_BTN_ON
-                end
-                dropdownBtn.Text = "Targets: " .. #env.targetEggs .. " Selected ▼"
-            end
-        end)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -8, 0, 25); lbl.ZIndex = 10
+        lbl.BackgroundColor3 = C_SIDEBAR; lbl.BorderSizePixel = 0
+        lbl.TextColor3 = C_TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 11; lbl.Text = eggName
+        lbl.Parent = spawnedScrollList
+        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 4)
     end
-    eggScrollList.CanvasSize = UDim2.new(0, 0, 0, #foundEggs * 27)
+    spawnedScrollList.CanvasSize = UDim2.new(0, 0, 0, #foundEggs * 27)
 end
 
 refreshEggsBtn.MouseButton1Click:Connect(function()
-    dropdownBtn.Text = "Scanning..."
-    populateEggList()
+    spawnedDropdownBtn.Text = "Scanning..."
     task.wait(0.2)
-    dropdownBtn.Text = "Targets: " .. #env.targetEggs .. " Selected ▼"
+    scanMapAndRenderSpawned()
 end)
-populateEggList()
+
+-- Initialize Lists
+renderTargetList()
+scanMapAndRenderSpawned()
 
 -- ===================== TAB SWITCHING =====================
 local function switchTab(tabName)
@@ -367,6 +433,9 @@ local function switchTab(tabName)
     tabHalloweenBtn.BackgroundColor3 = (tabName == "Halloween") and C_BTN_OFF or C_SIDEBAR
     tabTeleportBtn.BackgroundColor3 = (tabName == "Teleports") and C_BTN_OFF or C_SIDEBAR
     tabEggBtn.BackgroundColor3 = (tabName == "Auto Egg") and C_BTN_OFF or C_SIDEBAR
+    
+    targetScrollList.Visible = false
+    spawnedScrollList.Visible = false
 end
 
 tabHalloweenBtn.MouseButton1Click:Connect(function() switchTab("Halloween") end)
@@ -419,20 +488,14 @@ end
 -- PROMPT TRIGGER
 local function triggerPrompt(prompt)
     if not prompt or not prompt.Enabled then return false end
-    
     local oldLOS = prompt.RequiresLineOfSight
     prompt.RequiresLineOfSight = false
-    
-    if fireproximityprompt then
-        pcall(function() fireproximityprompt(prompt, 1, true) end)
-    end
-    
+    if fireproximityprompt then pcall(function() fireproximityprompt(prompt, 1, true) end) end
     pcall(function()
         prompt:InputHoldBegin()
         task.wait(math.max(prompt.HoldDuration, 0.05) + 0.05)
         prompt:InputHoldEnd()
     end)
-    
     prompt.RequiresLineOfSight = oldLOS
     return true
 end
@@ -624,7 +687,7 @@ task.spawn(function()
 
         local processedEgg = false
 
-        -- [0] AUTO VOLCANIC EGG (HIGHEST PRIORITY - CUSTOM INFILTRATION)
+        -- [0] AUTO VOLCANIC EGG
         if env.autoVolcanicEgg then
             local vEgg = nil
             local renderedEggs = workspace:FindFirstChild("RenderedEggs")
@@ -640,26 +703,22 @@ task.spawn(function()
             if vEgg then
                 processedEgg = true
                 env.isDipping = true
-                env.suppressDipHook = true -- Disables regular dip hook so we can manually exit the cave first
+                env.suppressDipHook = true 
                 
                 local hrp = charHRP()
                 if hrp then
                     statusLabel.Text = "Status: Infiltrating Volcano..."
                     hrp.Anchored = false
                     
-                    -- 1. TP Outside Entrance
                     hrp.CFrame = CFrame.new(CAVE_OUTSIDE_COORDS)
                     task.wait(0.5)
                     
-                    -- 2. Slow Fly Inside
                     slowFlyTo(CAVE_INSIDE_COORDS)
                     task.wait(0.5)
                     
-                    -- 3. TP to Egg
                     hrp.CFrame = CFrame.new(vEgg:GetPivot().Position)
                     task.wait(0.5)
                     
-                    -- 4. Claim Egg
                     local prompt = vEgg:FindFirstChildWhichIsA("ProximityPrompt", true)
                     triggerPrompt(prompt)
                     
@@ -669,16 +728,13 @@ task.spawn(function()
                         timeout = timeout + 1
                     end
                     
-                    -- 5. TP Inside Entrance
                     hrp.CFrame = CFrame.new(CAVE_INSIDE_COORDS)
                     task.wait(0.5)
                     
-                    -- 6. Slow Fly Outside
                     statusLabel.Text = "Status: Exiting Volcano..."
                     slowFlyTo(CAVE_OUTSIDE_COORDS)
                     task.wait(0.5)
                     
-                    -- 7. Execute Dip Sequence (if Auto Dip is on)
                     if env.autoDip then
                         statusLabel.Text = "Status: Dipping Volcanic Egg..."
                         hrp.CFrame = CFrame.new(VOLCANO_COORDS)
@@ -687,12 +743,12 @@ task.spawn(function()
                         local dipRemote = RS:FindFirstChild("packages") and RS.packages:FindFirstChild("Net") and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
                         if dipRemote then dipRemote:FireServer() end
                         
-                        task.wait(10) -- Wait 10 seconds at volcano
+                        task.wait(10)
                         
                         hrp = charHRP()
                         if hrp then
                             hrp.CFrame = CFrame.new(FOOD_STALL_COORDS)
-                            task.wait(5) -- Wait 5 seconds at food stall
+                            task.wait(5)
                             
                             local ranchPos = getPlayerRanchCoords()
                             if ranchPos then
@@ -702,13 +758,9 @@ task.spawn(function()
                         end
                     end
                     
-                    -- 8. Return to Halloween area if candy farm is enabled
                     if env.auto then
                         hrp = charHRP()
-                        if hrp then
-                            hrp.CFrame = HALLOWEEN_COORDS
-                            task.wait(0.5)
-                        end
+                        if hrp then hrp.CFrame = HALLOWEEN_COORDS; task.wait(0.5) end
                     end
                 end
                 
@@ -717,7 +769,6 @@ task.spawn(function()
             end
         end
 
-        -- Restart loop immediately if volcanic egg was processed to check for more eggs
         if processedEgg then
             task.wait(0.1)
             continue
@@ -731,7 +782,6 @@ task.spawn(function()
                 for _, egg in ipairs(renderedEggs:GetChildren()) do
                     if env._menuId ~= myId then break end
                     
-                    -- Skip Volcanic Egg here since it has its own custom pathing above
                     if egg:IsA("Model") and egg.Name ~= "Volcanic Egg" and table.find(env.targetEggs, egg.Name) then
                         processedEgg = true
                         local targetPos = egg:GetPivot().Position
@@ -743,14 +793,11 @@ task.spawn(function()
                             local hrp = charHRP()
                             if hrp then 
                                 hrp.Anchored = false
-                                
-                                -- 1. Pre-Load Terrain Sequences to prevent falling
                                 hrp.CFrame = CFrame.new(FOOD_STALL_COORDS)
                                 task.wait(0.4)
                                 hrp.CFrame = CFrame.new(VOLCANO_COORDS)
                                 task.wait(0.4)
                                 
-                                -- 2. Teleport to Egg
                                 hrp.CFrame = CFrame.new(targetPos) 
                                 hrp.AssemblyLinearVelocity = Vector3.zero
                             end
@@ -765,18 +812,13 @@ task.spawn(function()
                                 timeout = timeout + 1
                             end
                             
-                            -- Wait to see if Dip Hook activates
                             task.wait(0.5)
                             while env.isDipping do task.wait(0.5) end
                             
-                            -- Return to Halloween Area
                             if env.auto then
                                 statusLabel.Text = "Status: Returning to Halloween Area"
                                 hrp = charHRP()
-                                if hrp then
-                                    hrp.CFrame = HALLOWEEN_COORDS
-                                    task.wait(0.5)
-                                end
+                                if hrp then hrp.CFrame = HALLOWEEN_COORDS; task.wait(0.5) end
                             end
                         end
                         break 
@@ -845,7 +887,6 @@ task.spawn(function()
                 end
 
                 for i, part in ipairs(candies) do
-                    -- Re-check priority
                     if (env.autoFarmEggs and #env.targetEggs > 0) or env.autoVolcanicEgg then
                         local renderedEggs = workspace:FindFirstChild("RenderedEggs")
                         local shouldBreak = false
@@ -917,4 +958,4 @@ env._menuCleanup = function()
     screenGui:Destroy()
 end
 
-print("[Menu Halloween v23 | Volcanic Egg Infiltration] loaded.")
+print("[Menu Halloween v24 | Dual Egg Lists & Anti-AFK] loaded.")
