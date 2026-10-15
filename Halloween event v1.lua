@@ -1,5 +1,5 @@
 --[[=====================================================
-    MENU HALLOWEEN v24 by Vince (Dual Egg Lists & Anti-AFK)
+    MENU HALLOWEEN v26 by Vince (Ghost TP Buy & Safe TP)
 =====================================================]]
 
 local Players      = game:GetService("Players")
@@ -46,6 +46,9 @@ env.autoFarmEggs    = false
 env.autoVolcanicEgg = false
 env.autoBuyEgg      = false
 env.targetEggs      = {} 
+env.espEnabled      = false
+env.espTarget       = "All"
+env.tpTargetEggName = nil
 env.isDipping       = false
 env.suppressDipHook = false 
 
@@ -85,23 +88,20 @@ local function sendNotification(title, text)
 end
 
 -- ===================== ANTI-AFK SYSTEM =====================
--- 1. Native Roblox Backup
 plr.Idled:Connect(function()
     VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(1)
     VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- 2. 10-Minute Screen Clicker
 local idleSeconds = 0
 UIS.InputBegan:Connect(function() idleSeconds = 0 end)
 UIS.InputChanged:Connect(function() idleSeconds = 0 end)
-
 task.spawn(function()
     while env._menuId == myId do
         task.wait(1)
         idleSeconds = idleSeconds + 1
-        if idleSeconds >= 600 then -- 10 Minutes = 600 seconds
+        if idleSeconds >= 600 then
             local cam = workspace.CurrentCamera
             if cam then
                 local midX, midY = cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2
@@ -112,6 +112,27 @@ task.spawn(function()
         end
     end
 end)
+
+-- ===================== GET EGG KG HELPER =====================
+local function getEggKg(egg)
+    local kg = nil
+    pcall(function()
+        for k, v in pairs(egg:GetAttributes()) do
+            if string.lower(tostring(k)):find("kg") or string.lower(tostring(k)):find("weight") or string.lower(tostring(k)):find("mass") then
+                kg = tonumber(v)
+            end
+        end
+        if not kg then
+            for _, c in ipairs(egg:GetChildren()) do
+                if (c:IsA("NumberValue") or c:IsA("IntValue") or c:IsA("StringValue")) and 
+                   (string.lower(c.Name):find("kg") or string.lower(c.Name):find("weight") or string.lower(c.Name):find("mass")) then
+                    kg = tonumber(c.Value)
+                end
+            end
+        end
+    end)
+    return kg
+end
 
 -- ===================== DYNAMIC RANCH FINDER =====================
 local function getPlayerRanchCoords()
@@ -169,7 +190,8 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             local hrp = charHRP()
             if hrp then
                 hrp.CFrame = CFrame.new(VOLCANO_COORDS)
-                task.wait(0.6) 
+                task.wait(1.6) 
+                
                 local dipRemote = RS:FindFirstChild("packages") and RS.packages:FindFirstChild("Net") and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
                 if dipRemote then dipRemote:FireServer() end
                 
@@ -198,6 +220,12 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HalloweenMenu"; screenGui.ResetOnSpawn = false
 screenGui.Parent = plr:WaitForChild("PlayerGui")
 
+if env._espFolder then pcall(function() env._espFolder:Destroy() end) end
+local espFolder = Instance.new("Folder")
+espFolder.Name = "HalloweenESP"
+espFolder.Parent = screenGui
+env._espFolder = espFolder
+
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.fromOffset(45, 45)
 toggleBtn.Position = UDim2.new(0, 20, 0, 20)
@@ -209,7 +237,7 @@ toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.fromOffset(420, 390)
+mainFrame.Size = UDim2.fromOffset(420, 460)
 mainFrame.Position = UDim2.new(0, 20, 0, 80)
 mainFrame.BackgroundColor3 = C_BG
 mainFrame.BorderSizePixel = 0; mainFrame.Active = true; mainFrame.Draggable = true
@@ -295,134 +323,175 @@ local teleportFrame = Instance.new("Frame")
 teleportFrame.Size = UDim2.new(1, 0, 1, 0); teleportFrame.BackgroundTransparency = 1
 teleportFrame.Visible = false; teleportFrame.Parent = contentArea
 
-local foodStallBtn = createButton(teleportFrame, "TP: FOOD STALLS", 15, 40, 12)
-local volcanoBtn = createButton(teleportFrame, "TP: VOLCANO", 65, 40, 12)
-local autoDipBtn = createButton(teleportFrame, "AUTO DIP: OFF", 115, 45, 14)
+local foodStallBtn = createButton(teleportFrame, "TP: FOOD STALLS", 10, 35, 12)
+local volcanoBtn = createButton(teleportFrame, "TP: VOLCANO", 50, 35, 12)
+local autoDipBtn = createButton(teleportFrame, "AUTO DIP: OFF", 90, 35, 14)
+
+local tpToEggBtn = createButton(teleportFrame, "TP TO SELECTED EGG", 130, 35, 12)
+local tpScanBtn = createButton(teleportFrame, "SCAN MAP FOR SPAWNED EGGS", 170, 25, 11)
+tpScanBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
+local tpSpawnedDropdownBtn = createButton(teleportFrame, "Select Spawned Egg ▼", 200, 25, 11)
+tpSpawnedDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
+
+local tpSpawnedScrollList = Instance.new("ScrollingFrame")
+tpSpawnedScrollList.Size = UDim2.new(1, -20, 0, 150); tpSpawnedScrollList.Position = UDim2.new(0, 10, 0, 230)
+tpSpawnedScrollList.BackgroundColor3 = C_SIDEBAR; tpSpawnedScrollList.BorderSizePixel = 0
+tpSpawnedScrollList.ScrollBarThickness = 4; tpSpawnedScrollList.Visible = false; tpSpawnedScrollList.ZIndex = 15
+tpSpawnedScrollList.Parent = teleportFrame
+Instance.new("UICorner", tpSpawnedScrollList).CornerRadius = UDim.new(0, 6)
+local tpSpawnedLayout = Instance.new("UIListLayout")
+tpSpawnedLayout.Parent = tpSpawnedScrollList; tpSpawnedLayout.SortOrder = Enum.SortOrder.LayoutOrder; tpSpawnedLayout.Padding = UDim.new(0, 2)
 
 -- ===================== TAB 3: AUTO EGG =====================
 local eggFrame = Instance.new("Frame")
 eggFrame.Size = UDim2.new(1, 0, 1, 0); eggFrame.BackgroundTransparency = 1
 eggFrame.Visible = false; eggFrame.Parent = contentArea
 
-local autoFarmEggBtn = createButton(eggFrame, "AUTO FARM EGGS: OFF", 10, 30, 12)
-local autoEggMacroBtn = createButton(eggFrame, "CLAIM MAP EGG (ONCE)", 45, 30, 12)
-local autoVolcanicBtn = createButton(eggFrame, "AUTO VOLCANIC EGG: OFF", 80, 30, 12)
+local autoFarmEggBtn = createButton(eggFrame, "AUTO FARM EGGS: OFF", 10, 35, 12)
+local autoEggMacroBtn = createButton(eggFrame, "CLAIM MAP EGG (ONCE)", 50, 35, 12)
+local autoVolcanicBtn = createButton(eggFrame, "AUTO VOLCANIC EGG: OFF", 90, 35, 12)
 
--- Dropdown 1: Select Best Egg (Target Multi-Select)
-local targetDropdownBtn = createButton(eggFrame, "Select best egg ▼", 115, 25, 11)
+local targetDropdownBtn = createButton(eggFrame, "Select Best Eggs ▼", 130, 25, 11)
 targetDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
 
--- Refresh Button
-local refreshEggsBtn = createButton(eggFrame, "SCAN MAP FOR EGGS", 145, 25, 11)
+local espEggBtn = createButton(eggFrame, "ESP EGG: OFF", 160, 35, 14)
+local espDropdownBtn = createButton(eggFrame, "ESP Target: All ▼", 200, 25, 11)
+espDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
+
+local refreshEggsBtn = createButton(eggFrame, "REFRESH EGG LISTS", 230, 25, 11)
 refreshEggsBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
 
--- Dropdown 2: Spawned Monitor (Read-Only)
-local spawnedDropdownBtn = createButton(eggFrame, "Spawned Monitor ▼", 175, 25, 11)
-spawnedDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
-
--- TARGET SCROLL LIST (High Z-Index so it overlaps everything)
 local targetScrollList = Instance.new("ScrollingFrame")
-targetScrollList.Size = UDim2.new(1, -20, 0, 130); targetScrollList.Position = UDim2.new(0, 10, 0, 145)
+targetScrollList.Size = UDim2.new(1, -20, 0, 150); targetScrollList.Position = UDim2.new(0, 10, 0, 160)
 targetScrollList.BackgroundColor3 = C_SIDEBAR; targetScrollList.BorderSizePixel = 0
-targetScrollList.ScrollBarThickness = 4; targetScrollList.Visible = false; targetScrollList.ZIndex = 10
+targetScrollList.ScrollBarThickness = 4; targetScrollList.Visible = false; targetScrollList.ZIndex = 15
 targetScrollList.Parent = eggFrame
 Instance.new("UICorner", targetScrollList).CornerRadius = UDim.new(0, 6)
-local targetListLayout = Instance.new("UIListLayout")
-targetListLayout.Parent = targetScrollList; targetListLayout.SortOrder = Enum.SortOrder.LayoutOrder; targetListLayout.Padding = UDim.new(0, 2)
+local targetLayout = Instance.new("UIListLayout"); targetLayout.Parent = targetScrollList; targetLayout.SortOrder = Enum.SortOrder.LayoutOrder; targetLayout.Padding = UDim.new(0, 2)
 
--- SPAWNED SCROLL LIST
-local spawnedScrollList = Instance.new("ScrollingFrame")
-spawnedScrollList.Size = UDim2.new(1, -20, 0, 100); spawnedScrollList.Position = UDim2.new(0, 10, 0, 205)
-spawnedScrollList.BackgroundColor3 = C_SIDEBAR; spawnedScrollList.BorderSizePixel = 0
-spawnedScrollList.ScrollBarThickness = 4; spawnedScrollList.Visible = false; spawnedScrollList.ZIndex = 10
-spawnedScrollList.Parent = eggFrame
-Instance.new("UICorner", spawnedScrollList).CornerRadius = UDim.new(0, 6)
-local spawnedListLayout = Instance.new("UIListLayout")
-spawnedListLayout.Parent = spawnedScrollList; spawnedListLayout.SortOrder = Enum.SortOrder.LayoutOrder; spawnedListLayout.Padding = UDim.new(0, 2)
+local espScrollList = Instance.new("ScrollingFrame")
+espScrollList.Size = UDim2.new(1, -20, 0, 150); espScrollList.Position = UDim2.new(0, 10, 0, 230)
+espScrollList.BackgroundColor3 = C_SIDEBAR; espScrollList.BorderSizePixel = 0
+espScrollList.ScrollBarThickness = 4; espScrollList.Visible = false; espScrollList.ZIndex = 15
+espScrollList.Parent = eggFrame
+Instance.new("UICorner", espScrollList).CornerRadius = UDim.new(0, 6)
+local espLayout = Instance.new("UIListLayout"); espLayout.Parent = espScrollList; espLayout.SortOrder = Enum.SortOrder.LayoutOrder; espLayout.Padding = UDim.new(0, 2)
 
--- Dropdown Logic
 targetDropdownBtn.MouseButton1Click:Connect(function() 
-    targetScrollList.Visible = not targetScrollList.Visible 
-    spawnedScrollList.Visible = false
+    targetScrollList.Visible = not targetScrollList.Visible; espScrollList.Visible = false 
 end)
-spawnedDropdownBtn.MouseButton1Click:Connect(function() 
-    spawnedScrollList.Visible = not spawnedScrollList.Visible 
-    targetScrollList.Visible = false
+espDropdownBtn.MouseButton1Click:Connect(function() 
+    espScrollList.Visible = not espScrollList.Visible; targetScrollList.Visible = false 
+end)
+tpSpawnedDropdownBtn.MouseButton1Click:Connect(function()
+    tpSpawnedScrollList.Visible = not tpSpawnedScrollList.Visible
 end)
 
-local function renderTargetList()
-    for _, child in ipairs(targetScrollList:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
+-- ===================== LIST BUILDERS =====================
+local function updateKnownEggs()
+    local renderedEggs = workspace:FindFirstChild("RenderedEggs")
+    if renderedEggs then
+        for _, egg in ipairs(renderedEggs:GetChildren()) do
+            if egg:IsA("Model") and not table.find(KNOWN_EGGS, egg.Name) then
+                table.insert(KNOWN_EGGS, egg.Name)
+            end
+        end
     end
     table.sort(KNOWN_EGGS)
+end
+
+local function refreshTargetAndEspLists()
+    updateKnownEggs()
+    for _, c in ipairs(targetScrollList:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+    for _, c in ipairs(espScrollList:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+    
+    local btnAll = Instance.new("TextButton")
+    btnAll.Size = UDim2.new(1, -8, 0, 25); btnAll.BackgroundColor3 = (env.espTarget == "All") and C_BTN_ON or C_SIDEBAR
+    btnAll.BorderSizePixel = 0; btnAll.TextColor3 = C_TEXT; btnAll.Font = Enum.Font.Gotham; btnAll.TextSize = 11; btnAll.Text = "All Spawned Eggs"
+    btnAll.Parent = espScrollList
+    Instance.new("UICorner", btnAll).CornerRadius = UDim.new(0, 4)
+    btnAll.MouseButton1Click:Connect(function()
+        env.espTarget = "All"; espDropdownBtn.Text = "ESP Target: All ▼"
+        espScrollList.Visible = false; refreshTargetAndEspLists()
+    end)
+
     for _, eggName in ipairs(KNOWN_EGGS) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -8, 0, 25); btn.ZIndex = 10
-        btn.BackgroundColor3 = table.find(env.targetEggs, eggName) and C_BTN_ON or C_SIDEBAR
-        btn.BorderSizePixel = 0; btn.TextColor3 = C_TEXT
-        btn.Font = Enum.Font.Gotham; btn.TextSize = 11; btn.Text = eggName
-        btn.Parent = targetScrollList
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-        
-        btn.MouseButton1Click:Connect(function()
+        local tBtn = Instance.new("TextButton")
+        tBtn.Size = UDim2.new(1, -8, 0, 25); tBtn.BackgroundColor3 = table.find(env.targetEggs, eggName) and C_BTN_ON or C_SIDEBAR
+        tBtn.BorderSizePixel = 0; tBtn.TextColor3 = C_TEXT; tBtn.Font = Enum.Font.Gotham; tBtn.TextSize = 11; tBtn.Text = eggName
+        tBtn.Parent = targetScrollList
+        Instance.new("UICorner", tBtn).CornerRadius = UDim.new(0, 4)
+        tBtn.MouseButton1Click:Connect(function()
             local idx = table.find(env.targetEggs, eggName)
-            if idx then
-                table.remove(env.targetEggs, idx)
-                btn.BackgroundColor3 = C_SIDEBAR
-            else
-                table.insert(env.targetEggs, eggName)
-                btn.BackgroundColor3 = C_BTN_ON
-            end
+            if idx then table.remove(env.targetEggs, idx) else table.insert(env.targetEggs, eggName) end
             targetDropdownBtn.Text = "Targets: " .. #env.targetEggs .. " Selected ▼"
+            refreshTargetAndEspLists()
+        end)
+        
+        local eBtn = Instance.new("TextButton")
+        eBtn.Size = UDim2.new(1, -8, 0, 25); eBtn.BackgroundColor3 = (env.espTarget == eggName) and C_BTN_ON or C_SIDEBAR
+        eBtn.BorderSizePixel = 0; eBtn.TextColor3 = C_TEXT; eBtn.Font = Enum.Font.Gotham; eBtn.TextSize = 11; eBtn.Text = eggName
+        eBtn.Parent = espScrollList
+        Instance.new("UICorner", eBtn).CornerRadius = UDim.new(0, 4)
+        eBtn.MouseButton1Click:Connect(function()
+            env.espTarget = eggName; espDropdownBtn.Text = "ESP Target: " .. eggName .. " ▼"
+            espScrollList.Visible = false; refreshTargetAndEspLists()
         end)
     end
     targetScrollList.CanvasSize = UDim2.new(0, 0, 0, #KNOWN_EGGS * 27)
+    espScrollList.CanvasSize = UDim2.new(0, 0, 0, (#KNOWN_EGGS + 1) * 27)
 end
 
-local function scanMapAndRenderSpawned()
-    for _, child in ipairs(spawnedScrollList:GetChildren()) do
-        if child:IsA("TextLabel") then child:Destroy() end
-    end
+local function refreshTpSpawnedList()
+    for _, c in ipairs(tpSpawnedScrollList:GetChildren()) do if c:IsA("TextButton") or c:IsA("TextLabel") then c:Destroy() end end
     
     local foundEggs = {}
     local renderedEggs = workspace:FindFirstChild("RenderedEggs")
-    
     if renderedEggs then
         for _, egg in ipairs(renderedEggs:GetChildren()) do
             if egg:IsA("Model") and not table.find(foundEggs, egg.Name) then
                 table.insert(foundEggs, egg.Name)
-                -- Add to master list if it's a completely brand new egg
-                if not table.find(KNOWN_EGGS, egg.Name) then
-                    table.insert(KNOWN_EGGS, egg.Name)
-                    renderTargetList()
-                end
             end
         end
     end
     
-    if #foundEggs == 0 then table.insert(foundEggs, "No Eggs on Map") end
-    spawnedDropdownBtn.Text = "Spawned Monitor: " .. (#foundEggs == 1 and foundEggs[1] == "No Eggs on Map" and "0" or tostring(#foundEggs)) .. " ▼"
+    if #foundEggs == 0 then
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -8, 0, 25); lbl.BackgroundColor3 = C_SIDEBAR; lbl.BorderSizePixel = 0
+        lbl.TextColor3 = C_TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 11; lbl.Text = "No Eggs on Map"
+        lbl.Parent = tpSpawnedScrollList
+        tpSpawnedDropdownBtn.Text = "Spawned: 0 ▼"
+        tpSpawnedScrollList.CanvasSize = UDim2.new(0, 0, 0, 27)
+        return
+    end
+    
+    tpSpawnedDropdownBtn.Text = "Spawned: " .. #foundEggs .. " ▼"
     
     for _, eggName in ipairs(foundEggs) do
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -8, 0, 25); lbl.ZIndex = 10
-        lbl.BackgroundColor3 = C_SIDEBAR; lbl.BorderSizePixel = 0
-        lbl.TextColor3 = C_TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 11; lbl.Text = eggName
-        lbl.Parent = spawnedScrollList
-        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 4)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -8, 0, 25); btn.BackgroundColor3 = (env.tpTargetEggName == eggName) and C_BTN_ON or C_SIDEBAR
+        btn.BorderSizePixel = 0; btn.TextColor3 = C_TEXT; btn.Font = Enum.Font.Gotham; btn.TextSize = 11; btn.Text = eggName
+        btn.Parent = tpSpawnedScrollList
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        
+        btn.MouseButton1Click:Connect(function()
+            env.tpTargetEggName = eggName
+            tpSpawnedDropdownBtn.Text = "TP Target: " .. eggName .. " ▼"
+            tpSpawnedScrollList.Visible = false
+            refreshTpSpawnedList()
+        end)
     end
-    spawnedScrollList.CanvasSize = UDim2.new(0, 0, 0, #foundEggs * 27)
+    tpSpawnedScrollList.CanvasSize = UDim2.new(0, 0, 0, #foundEggs * 27)
 end
 
 refreshEggsBtn.MouseButton1Click:Connect(function()
-    spawnedDropdownBtn.Text = "Scanning..."
-    task.wait(0.2)
-    scanMapAndRenderSpawned()
+    refreshTargetAndEspLists()
+    refreshTpSpawnedList()
 end)
+tpScanBtn.MouseButton1Click:Connect(function() refreshTpSpawnedList() end)
 
--- Initialize Lists
-renderTargetList()
-scanMapAndRenderSpawned()
+refreshTargetAndEspLists()
+refreshTpSpawnedList()
 
 -- ===================== TAB SWITCHING =====================
 local function switchTab(tabName)
@@ -435,7 +504,8 @@ local function switchTab(tabName)
     tabEggBtn.BackgroundColor3 = (tabName == "Auto Egg") and C_BTN_OFF or C_SIDEBAR
     
     targetScrollList.Visible = false
-    spawnedScrollList.Visible = false
+    espScrollList.Visible = false
+    tpSpawnedScrollList.Visible = false
 end
 
 tabHalloweenBtn.MouseButton1Click:Connect(function() switchTab("Halloween") end)
@@ -485,7 +555,6 @@ local function updateFlyingState()
     end
 end
 
--- PROMPT TRIGGER
 local function triggerPrompt(prompt)
     if not prompt or not prompt.Enabled then return false end
     local oldLOS = prompt.RequiresLineOfSight
@@ -566,6 +635,33 @@ autoDipBtn.MouseButton1Click:Connect(function()
     autoDipBtn.BackgroundColor3 = env.autoDip and C_BTN_ON or C_BTN_OFF
 end)
 
+-- TP TO SELECTED EGG (Strict Teleport)
+tpToEggBtn.MouseButton1Click:Connect(function()
+    if not env.tpTargetEggName then
+        sendNotification("Teleport", "Select an egg from the scanner first!")
+        return
+    end
+    local renderedEggs = workspace:FindFirstChild("RenderedEggs")
+    local found = false
+    if renderedEggs then
+        for _, egg in ipairs(renderedEggs:GetChildren()) do
+            if egg:IsA("Model") and egg.Name == env.tpTargetEggName then
+                local hrp = charHRP()
+                if hrp then
+                    hrp.Anchored = false
+                    -- Added Y+5 offset to prevent getting stuck in the ground or the egg model
+                    hrp.CFrame = egg:GetPivot() + Vector3.new(0, 5, 0)
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    found = true
+                    sendNotification("Teleport", "Teleported to " .. egg.Name)
+                    break
+                end
+            end
+        end
+    end
+    if not found then sendNotification("Teleport", "Egg is no longer on the map!") end
+end)
+
 autoBuyBtn.MouseButton1Click:Connect(function()
     env.autoBuyEgg = not env.autoBuyEgg
     autoBuyBtn.Text = "BUY SHOP EGG: " .. (env.autoBuyEgg and "ON" or "OFF")
@@ -594,6 +690,12 @@ autoEggMacroBtn.MouseButton1Click:Connect(function()
     env.autoEggMacro = true
     autoEggMacroBtn.Text = "CLAIMING..."
     autoEggMacroBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 0)
+end)
+
+espEggBtn.MouseButton1Click:Connect(function()
+    env.espEnabled = not env.espEnabled
+    espEggBtn.Text = "ESP EGG: " .. (env.espEnabled and "ON" or "OFF")
+    espEggBtn.BackgroundColor3 = env.espEnabled and C_BTN_ON or C_BTN_OFF
 end)
 
 moveButton.MouseButton1Click:Connect(function()
@@ -663,12 +765,69 @@ plr.CharacterAdded:Connect(function()
     updateFlyingState()
 end)
 
--- ===================== AUTO BUY LOOP =====================
+-- ===================== ESP RENDER LOOP =====================
+task.spawn(function()
+    while env._menuId == myId do
+        espFolder:ClearAllChildren()
+        if env.espEnabled then
+            local renderedEggs = workspace:FindFirstChild("RenderedEggs")
+            if renderedEggs then
+                for _, egg in ipairs(renderedEggs:GetChildren()) do
+                    if egg:IsA("Model") and (env.espTarget == "All" or egg.Name == env.espTarget) then
+                        local bb = Instance.new("BillboardGui")
+                        bb.Adornee = egg.PrimaryPart or egg:FindFirstChildWhichIsA("BasePart") or egg
+                        bb.Size = UDim2.new(0, 150, 0, 40)
+                        bb.StudsOffset = Vector3.new(0, 2, 0)
+                        bb.AlwaysOnTop = true
+                        bb.Parent = espFolder
+                        
+                        local txt = Instance.new("TextLabel")
+                        txt.Size = UDim2.new(1, 0, 1, 0)
+                        txt.BackgroundTransparency = 1
+                        txt.Font = Enum.Font.GothamBold
+                        txt.TextSize = 12
+                        txt.TextColor3 = Color3.fromRGB(0, 255, 128)
+                        txt.TextStrokeTransparency = 0.2
+                        
+                        local kg = getEggKg(egg)
+                        if kg then
+                            txt.Text = egg.Name .. "\n[" .. tostring(kg) .. " kg]"
+                        else
+                            txt.Text = egg.Name
+                        end
+                        txt.Parent = bb
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- ===================== AUTO BUY LOOP (GHOST TP) =====================
 task.spawn(function()
     while env._menuId == myId do
         if env.autoBuyEgg then
             local remote = RS:FindFirstChild("Remotes") and RS.Remotes:FindFirstChild("Game") and RS.Remotes.Game:FindFirstChild("BuyHalloweenEgg")
-            if remote then pcall(function() remote:InvokeServer("Halloween Egg") end) end
+            if remote then 
+                pcall(function() 
+                    local hrp = charHRP()
+                    if hrp then
+                        -- Check distance. If too far, Ghost TP to the Halloween shop area to bypass server checks
+                        local dist = (hrp.Position - HALLOWEEN_COORDS.Position).Magnitude
+                        if dist > 50 then
+                            local oldPos = hrp.CFrame
+                            hrp.CFrame = HALLOWEEN_COORDS
+                            task.wait(0.2)
+                            remote:InvokeServer("Halloween Egg")
+                            task.wait(0.2)
+                            hrp.CFrame = oldPos -- Instantly teleport back
+                        else
+                            remote:InvokeServer("Halloween Egg")
+                        end
+                    end
+                end) 
+            end
         end
         task.wait(1)
     end
@@ -678,7 +837,6 @@ end)
 task.spawn(function()
     while env._menuId == myId do
         
-        -- Pause logic if a dip sequence is running
         if env.isDipping then
             statusLabel.Text = "Status: Executing Sequence..."
             task.wait(0.5)
@@ -738,7 +896,7 @@ task.spawn(function()
                     if env.autoDip then
                         statusLabel.Text = "Status: Dipping Volcanic Egg..."
                         hrp.CFrame = CFrame.new(VOLCANO_COORDS)
-                        task.wait(0.6)
+                        task.wait(1.6) 
                         
                         local dipRemote = RS:FindFirstChild("packages") and RS.packages:FindFirstChild("Net") and RS.packages.Net:FindFirstChild("RE/VolcanoDip")
                         if dipRemote then dipRemote:FireServer() end
@@ -953,9 +1111,11 @@ env._menuCleanup = function()
     env.autoEggMacro = false
     env.autoVolcanicEgg = false
     env.autoBuyEgg = false
+    env.espEnabled = false
+    if env._espFolder then pcall(function() env._espFolder:Destroy() end) end
     updateFlyingState()
     env._menuId = env._menuId + 1
     screenGui:Destroy()
 end
 
-print("[Menu Halloween v24 | Dual Egg Lists & Anti-AFK] loaded.")
+print("[Menu Halloween v26 | Ghost TP Buy & Safe TP] loaded.")
