@@ -1,5 +1,5 @@
 --[[=====================================================
-    MENU HALLOWEEN v26 by Vince (Ghost TP Buy & Safe TP)
+    MENU HALLOWEEN v27 by Vince (Fixed Dropdown Lists)
 =====================================================]]
 
 local Players      = game:GetService("Players")
@@ -218,6 +218,7 @@ end)
 -- ===================== GUI MAIN =====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HalloweenMenu"; screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global -- Ensure exact layering
 screenGui.Parent = plr:WaitForChild("PlayerGui")
 
 if env._espFolder then pcall(function() env._espFolder:Destroy() end) end
@@ -233,6 +234,7 @@ toggleBtn.BackgroundColor3 = C_SIDEBAR
 toggleBtn.Text = "🎃"
 toggleBtn.TextSize = 25
 toggleBtn.BorderSizePixel = 0
+toggleBtn.ZIndex = 10
 toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
 
@@ -241,6 +243,7 @@ mainFrame.Size = UDim2.fromOffset(420, 460)
 mainFrame.Position = UDim2.new(0, 20, 0, 80)
 mainFrame.BackgroundColor3 = C_BG
 mainFrame.BorderSizePixel = 0; mainFrame.Active = true; mainFrame.Draggable = true
+mainFrame.ZIndex = 1
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
@@ -252,6 +255,7 @@ titleLabel.BackgroundColor3 = C_ACCENT
 titleLabel.Text = " Auto Halloween | by Vince"; titleLabel.TextColor3 = Color3.new(1,1,1)
 titleLabel.Font = Enum.Font.GothamBold; titleLabel.TextSize = 14
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.ZIndex = 2
 titleLabel.Parent = mainFrame
 Instance.new("UIPadding", titleLabel).PaddingLeft = UDim.new(0, 15)
 Instance.new("UICorner", titleLabel).CornerRadius = UDim.new(0, 10)
@@ -259,11 +263,13 @@ Instance.new("UICorner", titleLabel).CornerRadius = UDim.new(0, 10)
 local titleBlock = Instance.new("Frame")
 titleBlock.Size = UDim2.new(1, 0, 0, 10); titleBlock.Position = UDim2.new(0, 0, 1, -10)
 titleBlock.BackgroundColor3 = C_ACCENT; titleBlock.BorderSizePixel = 0
+titleBlock.ZIndex = 2
 titleBlock.Parent = titleLabel
 
 local sidebar = Instance.new("Frame")
 sidebar.Size = UDim2.new(0, 120, 1, -36); sidebar.Position = UDim2.new(0, 0, 0, 36)
 sidebar.BackgroundColor3 = C_SIDEBAR; sidebar.BorderSizePixel = 0
+sidebar.ZIndex = 2
 sidebar.Parent = mainFrame
 Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
 
@@ -273,6 +279,7 @@ local function createTabButton(text, yPos)
     btn.BackgroundColor3 = C_SIDEBAR; btn.BorderSizePixel = 0
     btn.Text = text; btn.TextColor3 = C_TEXT
     btn.Font = Enum.Font.GothamBold; btn.TextSize = 12
+    btn.ZIndex = 3
     btn.Parent = sidebar
     return btn
 end
@@ -285,7 +292,8 @@ tabHalloweenBtn.BackgroundColor3 = C_BTN_OFF
 
 local contentArea = Instance.new("Frame")
 contentArea.Size = UDim2.new(1, -120, 1, -36); contentArea.Position = UDim2.new(0, 120, 0, 36)
-contentArea.BackgroundTransparency = 1; contentArea.Parent = mainFrame
+contentArea.BackgroundTransparency = 1; contentArea.ZIndex = 2
+contentArea.Parent = mainFrame
 
 local function createButton(parent, text, yPos, height, fontSize)
     local btn = Instance.new("TextButton")
@@ -293,6 +301,7 @@ local function createButton(parent, text, yPos, height, fontSize)
     btn.BorderSizePixel = 0; btn.TextColor3 = C_TEXT
     btn.Font = Enum.Font.GothamBold; btn.TextSize = fontSize or 12
     btn.Text = text; btn.BackgroundColor3 = C_BTN_OFF
+    btn.ZIndex = 3
     btn.Parent = parent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     return btn
@@ -316,9 +325,10 @@ statusLabel.Size = UDim2.new(1, -20, 0, 40); statusLabel.Position = UDim2.new(0,
 statusLabel.BackgroundTransparency = 1; statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
 statusLabel.Font = Enum.Font.Gotham; statusLabel.TextSize = 11
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left; statusLabel.TextYAlignment = Enum.TextYAlignment.Top
+statusLabel.ZIndex = 3
 statusLabel.Text = "Status: Ready."; statusLabel.Parent = halloweenFrame
 
--- ===================== TAB 2: TELEPORTS =====================
+-- ===================== TAB 2: TELEPORTS (NEW EGG SCANNER) =====================
 local teleportFrame = Instance.new("Frame")
 teleportFrame.Size = UDim2.new(1, 0, 1, 0); teleportFrame.BackgroundTransparency = 1
 teleportFrame.Visible = false; teleportFrame.Parent = contentArea
@@ -333,16 +343,17 @@ tpScanBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
 local tpSpawnedDropdownBtn = createButton(teleportFrame, "Select Spawned Egg ▼", 200, 25, 11)
 tpSpawnedDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
 
+-- HIGHEST Z-INDEX SCROLL FRAME
 local tpSpawnedScrollList = Instance.new("ScrollingFrame")
 tpSpawnedScrollList.Size = UDim2.new(1, -20, 0, 150); tpSpawnedScrollList.Position = UDim2.new(0, 10, 0, 230)
 tpSpawnedScrollList.BackgroundColor3 = C_SIDEBAR; tpSpawnedScrollList.BorderSizePixel = 0
-tpSpawnedScrollList.ScrollBarThickness = 4; tpSpawnedScrollList.Visible = false; tpSpawnedScrollList.ZIndex = 15
+tpSpawnedScrollList.ScrollBarThickness = 4; tpSpawnedScrollList.Visible = false; tpSpawnedScrollList.ZIndex = 100
 tpSpawnedScrollList.Parent = teleportFrame
 Instance.new("UICorner", tpSpawnedScrollList).CornerRadius = UDim.new(0, 6)
 local tpSpawnedLayout = Instance.new("UIListLayout")
 tpSpawnedLayout.Parent = tpSpawnedScrollList; tpSpawnedLayout.SortOrder = Enum.SortOrder.LayoutOrder; tpSpawnedLayout.Padding = UDim.new(0, 2)
 
--- ===================== TAB 3: AUTO EGG =====================
+-- ===================== TAB 3: AUTO EGG (ESP & FARMING) =====================
 local eggFrame = Instance.new("Frame")
 eggFrame.Size = UDim2.new(1, 0, 1, 0); eggFrame.BackgroundTransparency = 1
 eggFrame.Visible = false; eggFrame.Parent = contentArea
@@ -361,10 +372,11 @@ espDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
 local refreshEggsBtn = createButton(eggFrame, "REFRESH EGG LISTS", 230, 25, 11)
 refreshEggsBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
 
+-- HIGHEST Z-INDEX SCROLL FRAMES
 local targetScrollList = Instance.new("ScrollingFrame")
 targetScrollList.Size = UDim2.new(1, -20, 0, 150); targetScrollList.Position = UDim2.new(0, 10, 0, 160)
 targetScrollList.BackgroundColor3 = C_SIDEBAR; targetScrollList.BorderSizePixel = 0
-targetScrollList.ScrollBarThickness = 4; targetScrollList.Visible = false; targetScrollList.ZIndex = 15
+targetScrollList.ScrollBarThickness = 4; targetScrollList.Visible = false; targetScrollList.ZIndex = 100
 targetScrollList.Parent = eggFrame
 Instance.new("UICorner", targetScrollList).CornerRadius = UDim.new(0, 6)
 local targetLayout = Instance.new("UIListLayout"); targetLayout.Parent = targetScrollList; targetLayout.SortOrder = Enum.SortOrder.LayoutOrder; targetLayout.Padding = UDim.new(0, 2)
@@ -372,11 +384,12 @@ local targetLayout = Instance.new("UIListLayout"); targetLayout.Parent = targetS
 local espScrollList = Instance.new("ScrollingFrame")
 espScrollList.Size = UDim2.new(1, -20, 0, 150); espScrollList.Position = UDim2.new(0, 10, 0, 230)
 espScrollList.BackgroundColor3 = C_SIDEBAR; espScrollList.BorderSizePixel = 0
-espScrollList.ScrollBarThickness = 4; espScrollList.Visible = false; espScrollList.ZIndex = 15
+espScrollList.ScrollBarThickness = 4; espScrollList.Visible = false; espScrollList.ZIndex = 100
 espScrollList.Parent = eggFrame
 Instance.new("UICorner", espScrollList).CornerRadius = UDim.new(0, 6)
 local espLayout = Instance.new("UIListLayout"); espLayout.Parent = espScrollList; espLayout.SortOrder = Enum.SortOrder.LayoutOrder; espLayout.Padding = UDim.new(0, 2)
 
+-- Dropdown Toggles (Now perfectly hides the others)
 targetDropdownBtn.MouseButton1Click:Connect(function() 
     targetScrollList.Visible = not targetScrollList.Visible; espScrollList.Visible = false 
 end)
@@ -387,7 +400,7 @@ tpSpawnedDropdownBtn.MouseButton1Click:Connect(function()
     tpSpawnedScrollList.Visible = not tpSpawnedScrollList.Visible
 end)
 
--- ===================== LIST BUILDERS =====================
+-- ===================== LIST BUILDERS (FIXED BUGS) =====================
 local function updateKnownEggs()
     local renderedEggs = workspace:FindFirstChild("RenderedEggs")
     if renderedEggs then
@@ -408,34 +421,53 @@ local function refreshTargetAndEspLists()
     local btnAll = Instance.new("TextButton")
     btnAll.Size = UDim2.new(1, -8, 0, 25); btnAll.BackgroundColor3 = (env.espTarget == "All") and C_BTN_ON or C_SIDEBAR
     btnAll.BorderSizePixel = 0; btnAll.TextColor3 = C_TEXT; btnAll.Font = Enum.Font.Gotham; btnAll.TextSize = 11; btnAll.Text = "All Spawned Eggs"
-    btnAll.Parent = espScrollList
+    btnAll.ZIndex = 101; btnAll.Parent = espScrollList
     Instance.new("UICorner", btnAll).CornerRadius = UDim.new(0, 4)
+    
     btnAll.MouseButton1Click:Connect(function()
         env.espTarget = "All"; espDropdownBtn.Text = "ESP Target: All ▼"
-        espScrollList.Visible = false; refreshTargetAndEspLists()
+        espScrollList.Visible = false
+        -- Smooth visual update without breaking layout
+        for _, b in ipairs(espScrollList:GetChildren()) do
+            if b:IsA("TextButton") then
+                b.BackgroundColor3 = (b.Text == "All Spawned Eggs") and C_BTN_ON or C_SIDEBAR
+            end
+        end
     end)
 
     for _, eggName in ipairs(KNOWN_EGGS) do
         local tBtn = Instance.new("TextButton")
         tBtn.Size = UDim2.new(1, -8, 0, 25); tBtn.BackgroundColor3 = table.find(env.targetEggs, eggName) and C_BTN_ON or C_SIDEBAR
         tBtn.BorderSizePixel = 0; tBtn.TextColor3 = C_TEXT; tBtn.Font = Enum.Font.Gotham; tBtn.TextSize = 11; tBtn.Text = eggName
-        tBtn.Parent = targetScrollList
+        tBtn.ZIndex = 101; tBtn.Parent = targetScrollList
         Instance.new("UICorner", tBtn).CornerRadius = UDim.new(0, 4)
+        
         tBtn.MouseButton1Click:Connect(function()
             local idx = table.find(env.targetEggs, eggName)
-            if idx then table.remove(env.targetEggs, idx) else table.insert(env.targetEggs, eggName) end
+            if idx then 
+                table.remove(env.targetEggs, idx)
+                tBtn.BackgroundColor3 = C_SIDEBAR
+            else 
+                table.insert(env.targetEggs, eggName)
+                tBtn.BackgroundColor3 = C_BTN_ON
+            end
             targetDropdownBtn.Text = "Targets: " .. #env.targetEggs .. " Selected ▼"
-            refreshTargetAndEspLists()
         end)
         
         local eBtn = Instance.new("TextButton")
         eBtn.Size = UDim2.new(1, -8, 0, 25); eBtn.BackgroundColor3 = (env.espTarget == eggName) and C_BTN_ON or C_SIDEBAR
         eBtn.BorderSizePixel = 0; eBtn.TextColor3 = C_TEXT; eBtn.Font = Enum.Font.Gotham; eBtn.TextSize = 11; eBtn.Text = eggName
-        eBtn.Parent = espScrollList
+        eBtn.ZIndex = 101; eBtn.Parent = espScrollList
         Instance.new("UICorner", eBtn).CornerRadius = UDim.new(0, 4)
+        
         eBtn.MouseButton1Click:Connect(function()
             env.espTarget = eggName; espDropdownBtn.Text = "ESP Target: " .. eggName .. " ▼"
-            espScrollList.Visible = false; refreshTargetAndEspLists()
+            espScrollList.Visible = false
+            for _, b in ipairs(espScrollList:GetChildren()) do
+                if b:IsA("TextButton") then
+                    b.BackgroundColor3 = (b.Text == eggName) and C_BTN_ON or C_SIDEBAR
+                end
+            end
         end)
     end
     targetScrollList.CanvasSize = UDim2.new(0, 0, 0, #KNOWN_EGGS * 27)
@@ -459,7 +491,7 @@ local function refreshTpSpawnedList()
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(1, -8, 0, 25); lbl.BackgroundColor3 = C_SIDEBAR; lbl.BorderSizePixel = 0
         lbl.TextColor3 = C_TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 11; lbl.Text = "No Eggs on Map"
-        lbl.Parent = tpSpawnedScrollList
+        lbl.ZIndex = 101; lbl.Parent = tpSpawnedScrollList
         tpSpawnedDropdownBtn.Text = "Spawned: 0 ▼"
         tpSpawnedScrollList.CanvasSize = UDim2.new(0, 0, 0, 27)
         return
@@ -471,14 +503,18 @@ local function refreshTpSpawnedList()
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, -8, 0, 25); btn.BackgroundColor3 = (env.tpTargetEggName == eggName) and C_BTN_ON or C_SIDEBAR
         btn.BorderSizePixel = 0; btn.TextColor3 = C_TEXT; btn.Font = Enum.Font.Gotham; btn.TextSize = 11; btn.Text = eggName
-        btn.Parent = tpSpawnedScrollList
+        btn.ZIndex = 101; btn.Parent = tpSpawnedScrollList
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
         
         btn.MouseButton1Click:Connect(function()
             env.tpTargetEggName = eggName
             tpSpawnedDropdownBtn.Text = "TP Target: " .. eggName .. " ▼"
             tpSpawnedScrollList.Visible = false
-            refreshTpSpawnedList()
+            for _, b in ipairs(tpSpawnedScrollList:GetChildren()) do
+                if b:IsA("TextButton") then
+                    b.BackgroundColor3 = (b.Text == eggName) and C_BTN_ON or C_SIDEBAR
+                end
+            end
         end)
     end
     tpSpawnedScrollList.CanvasSize = UDim2.new(0, 0, 0, #foundEggs * 27)
@@ -486,9 +522,10 @@ end
 
 refreshEggsBtn.MouseButton1Click:Connect(function()
     refreshTargetAndEspLists()
-    refreshTpSpawnedList()
 end)
-tpScanBtn.MouseButton1Click:Connect(function() refreshTpSpawnedList() end)
+tpScanBtn.MouseButton1Click:Connect(function() 
+    refreshTpSpawnedList() 
+end)
 
 refreshTargetAndEspLists()
 refreshTpSpawnedList()
@@ -649,7 +686,6 @@ tpToEggBtn.MouseButton1Click:Connect(function()
                 local hrp = charHRP()
                 if hrp then
                     hrp.Anchored = false
-                    -- Added Y+5 offset to prevent getting stuck in the ground or the egg model
                     hrp.CFrame = egg:GetPivot() + Vector3.new(0, 5, 0)
                     hrp.AssemblyLinearVelocity = Vector3.zero
                     found = true
@@ -813,7 +849,6 @@ task.spawn(function()
                 pcall(function() 
                     local hrp = charHRP()
                     if hrp then
-                        -- Check distance. If too far, Ghost TP to the Halloween shop area to bypass server checks
                         local dist = (hrp.Position - HALLOWEEN_COORDS.Position).Magnitude
                         if dist > 50 then
                             local oldPos = hrp.CFrame
@@ -821,7 +856,7 @@ task.spawn(function()
                             task.wait(0.2)
                             remote:InvokeServer("Halloween Egg")
                             task.wait(0.2)
-                            hrp.CFrame = oldPos -- Instantly teleport back
+                            hrp.CFrame = oldPos 
                         else
                             remote:InvokeServer("Halloween Egg")
                         end
@@ -1118,4 +1153,4 @@ env._menuCleanup = function()
     screenGui:Destroy()
 end
 
-print("[Menu Halloween v26 | Ghost TP Buy & Safe TP] loaded.")
+print("[Menu Halloween v27 | Fixed Dropdown Lists] loaded.")
