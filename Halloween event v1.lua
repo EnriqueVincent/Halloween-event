@@ -1,5 +1,5 @@
 --[[=====================================================
-    MENU HALLOWEEN v27 by Vince (Fixed Dropdown Lists)
+    MENU HALLOWEEN v29 by Vince (Smooth ESP & Deep KG Scan)
 =====================================================]]
 
 local Players      = game:GetService("Players")
@@ -51,8 +51,9 @@ env.espTarget       = "All"
 env.tpTargetEggName = nil
 env.isDipping       = false
 env.suppressDipHook = false 
+env.espCache        = {} -- Smart Cache for ESP so it doesn't lag
 
--- ALL KNOWN EGGS (Master Target List)
+-- ALL KNOWN EGGS
 local KNOWN_EGGS = {
     "Asteroid Egg", "Brown Egg", "Cherub Egg", "Halloween Egg", 
     "Solaris Egg", "Volcanic Egg", "Blue Egg", "Green Egg", "Red Egg"
@@ -113,25 +114,39 @@ task.spawn(function()
     end
 end)
 
--- ===================== GET EGG KG HELPER =====================
+-- ===================== AGGRESSIVE EGG KG HELPER =====================
 local function getEggKg(egg)
-    local kg = nil
+    local kgString = nil
     pcall(function()
+        -- 1. Check Attributes on the Model itself
         for k, v in pairs(egg:GetAttributes()) do
-            if string.lower(tostring(k)):find("kg") or string.lower(tostring(k)):find("weight") or string.lower(tostring(k)):find("mass") then
-                kg = tonumber(v)
+            local keyLower = string.lower(tostring(k))
+            if keyLower:find("kg") or keyLower:find("weight") or keyLower:find("mass") then
+                return tostring(v)
             end
         end
-        if not kg then
-            for _, c in ipairs(egg:GetChildren()) do
-                if (c:IsA("NumberValue") or c:IsA("IntValue") or c:IsA("StringValue")) and 
-                   (string.lower(c.Name):find("kg") or string.lower(c.Name):find("weight") or string.lower(c.Name):find("mass")) then
-                    kg = tonumber(c.Value)
+        -- 2. Deep scan for ValueObjects (StringValue, IntValue, NumberValue)
+        for _, c in ipairs(egg:GetDescendants()) do
+            if c:IsA("ValueBase") then
+                local nameLower = string.lower(c.Name)
+                if nameLower:find("kg") or nameLower:find("weight") or nameLower:find("mass") then
+                    return tostring(c.Value)
+                end
+            end
+        end
+        -- 3. Check for native game UI elements (BillboardGuis) that already display the KG
+        for _, c in ipairs(egg:GetDescendants()) do
+            if c:IsA("TextLabel") or c:IsA("TextButton") then
+                local txtLower = string.lower(c.Text)
+                if txtLower:find("kg") then
+                    -- Clean the text if it includes other things
+                    local match = c.Text:match("(%d+%.?%d*%s*kg)") or c.Text:match("(%d+%.?%d*%s*KG)")
+                    if match then return match else return c.Text end
                 end
             end
         end
     end)
-    return kg
+    return kgString
 end
 
 -- ===================== DYNAMIC RANCH FINDER =====================
@@ -218,7 +233,7 @@ end)
 -- ===================== GUI MAIN =====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "HalloweenMenu"; screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global -- Ensure exact layering
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 screenGui.Parent = plr:WaitForChild("PlayerGui")
 
 if env._espFolder then pcall(function() env._espFolder:Destroy() end) end
@@ -328,7 +343,7 @@ statusLabel.TextXAlignment = Enum.TextXAlignment.Left; statusLabel.TextYAlignmen
 statusLabel.ZIndex = 3
 statusLabel.Text = "Status: Ready."; statusLabel.Parent = halloweenFrame
 
--- ===================== TAB 2: TELEPORTS (NEW EGG SCANNER) =====================
+-- ===================== TAB 2: TELEPORTS =====================
 local teleportFrame = Instance.new("Frame")
 teleportFrame.Size = UDim2.new(1, 0, 1, 0); teleportFrame.BackgroundTransparency = 1
 teleportFrame.Visible = false; teleportFrame.Parent = contentArea
@@ -343,7 +358,6 @@ tpScanBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
 local tpSpawnedDropdownBtn = createButton(teleportFrame, "Select Spawned Egg ▼", 200, 25, 11)
 tpSpawnedDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
 
--- HIGHEST Z-INDEX SCROLL FRAME
 local tpSpawnedScrollList = Instance.new("ScrollingFrame")
 tpSpawnedScrollList.Size = UDim2.new(1, -20, 0, 150); tpSpawnedScrollList.Position = UDim2.new(0, 10, 0, 230)
 tpSpawnedScrollList.BackgroundColor3 = C_SIDEBAR; tpSpawnedScrollList.BorderSizePixel = 0
@@ -353,7 +367,7 @@ Instance.new("UICorner", tpSpawnedScrollList).CornerRadius = UDim.new(0, 6)
 local tpSpawnedLayout = Instance.new("UIListLayout")
 tpSpawnedLayout.Parent = tpSpawnedScrollList; tpSpawnedLayout.SortOrder = Enum.SortOrder.LayoutOrder; tpSpawnedLayout.Padding = UDim.new(0, 2)
 
--- ===================== TAB 3: AUTO EGG (ESP & FARMING) =====================
+-- ===================== TAB 3: AUTO EGG =====================
 local eggFrame = Instance.new("Frame")
 eggFrame.Size = UDim2.new(1, 0, 1, 0); eggFrame.BackgroundTransparency = 1
 eggFrame.Visible = false; eggFrame.Parent = contentArea
@@ -372,7 +386,6 @@ espDropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 65, 85)
 local refreshEggsBtn = createButton(eggFrame, "REFRESH EGG LISTS", 230, 25, 11)
 refreshEggsBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 160)
 
--- HIGHEST Z-INDEX SCROLL FRAMES
 local targetScrollList = Instance.new("ScrollingFrame")
 targetScrollList.Size = UDim2.new(1, -20, 0, 150); targetScrollList.Position = UDim2.new(0, 10, 0, 160)
 targetScrollList.BackgroundColor3 = C_SIDEBAR; targetScrollList.BorderSizePixel = 0
@@ -389,7 +402,6 @@ espScrollList.Parent = eggFrame
 Instance.new("UICorner", espScrollList).CornerRadius = UDim.new(0, 6)
 local espLayout = Instance.new("UIListLayout"); espLayout.Parent = espScrollList; espLayout.SortOrder = Enum.SortOrder.LayoutOrder; espLayout.Padding = UDim.new(0, 2)
 
--- Dropdown Toggles (Now perfectly hides the others)
 targetDropdownBtn.MouseButton1Click:Connect(function() 
     targetScrollList.Visible = not targetScrollList.Visible; espScrollList.Visible = false 
 end)
@@ -400,7 +412,7 @@ tpSpawnedDropdownBtn.MouseButton1Click:Connect(function()
     tpSpawnedScrollList.Visible = not tpSpawnedScrollList.Visible
 end)
 
--- ===================== LIST BUILDERS (FIXED BUGS) =====================
+-- ===================== LIST BUILDERS =====================
 local function updateKnownEggs()
     local renderedEggs = workspace:FindFirstChild("RenderedEggs")
     if renderedEggs then
@@ -427,7 +439,6 @@ local function refreshTargetAndEspLists()
     btnAll.MouseButton1Click:Connect(function()
         env.espTarget = "All"; espDropdownBtn.Text = "ESP Target: All ▼"
         espScrollList.Visible = false
-        -- Smooth visual update without breaking layout
         for _, b in ipairs(espScrollList:GetChildren()) do
             if b:IsA("TextButton") then
                 b.BackgroundColor3 = (b.Text == "All Spawned Eggs") and C_BTN_ON or C_SIDEBAR
@@ -520,12 +531,8 @@ local function refreshTpSpawnedList()
     tpSpawnedScrollList.CanvasSize = UDim2.new(0, 0, 0, #foundEggs * 27)
 end
 
-refreshEggsBtn.MouseButton1Click:Connect(function()
-    refreshTargetAndEspLists()
-end)
-tpScanBtn.MouseButton1Click:Connect(function() 
-    refreshTpSpawnedList() 
-end)
+refreshEggsBtn.MouseButton1Click:Connect(function() refreshTargetAndEspLists() end)
+tpScanBtn.MouseButton1Click:Connect(function() refreshTpSpawnedList() end)
 
 refreshTargetAndEspLists()
 refreshTpSpawnedList()
@@ -672,7 +679,6 @@ autoDipBtn.MouseButton1Click:Connect(function()
     autoDipBtn.BackgroundColor3 = env.autoDip and C_BTN_ON or C_BTN_OFF
 end)
 
--- TP TO SELECTED EGG (Strict Teleport)
 tpToEggBtn.MouseButton1Click:Connect(function()
     if not env.tpTargetEggName then
         sendNotification("Teleport", "Select an egg from the scanner first!")
@@ -801,68 +807,75 @@ plr.CharacterAdded:Connect(function()
     updateFlyingState()
 end)
 
--- ===================== ESP RENDER LOOP =====================
+-- ===================== ESP RENDER ENGINE =====================
 task.spawn(function()
     while env._menuId == myId do
-        espFolder:ClearAllChildren()
         if env.espEnabled then
             local renderedEggs = workspace:FindFirstChild("RenderedEggs")
             if renderedEggs then
+                -- Add missing ESPs
                 for _, egg in ipairs(renderedEggs:GetChildren()) do
                     if egg:IsA("Model") and (env.espTarget == "All" or egg.Name == env.espTarget) then
-                        local bb = Instance.new("BillboardGui")
-                        bb.Adornee = egg.PrimaryPart or egg:FindFirstChildWhichIsA("BasePart") or egg
-                        bb.Size = UDim2.new(0, 150, 0, 40)
-                        bb.StudsOffset = Vector3.new(0, 2, 0)
-                        bb.AlwaysOnTop = true
-                        bb.Parent = espFolder
-                        
-                        local txt = Instance.new("TextLabel")
-                        txt.Size = UDim2.new(1, 0, 1, 0)
-                        txt.BackgroundTransparency = 1
-                        txt.Font = Enum.Font.GothamBold
-                        txt.TextSize = 12
-                        txt.TextColor3 = Color3.fromRGB(0, 255, 128)
-                        txt.TextStrokeTransparency = 0.2
-                        
-                        local kg = getEggKg(egg)
-                        if kg then
-                            txt.Text = egg.Name .. "\n[" .. tostring(kg) .. " kg]"
-                        else
-                            txt.Text = egg.Name
+                        if not env.espCache[egg] then
+                            local bb = Instance.new("BillboardGui")
+                            bb.Adornee = egg.PrimaryPart or egg:FindFirstChildWhichIsA("BasePart") or egg
+                            bb.Size = UDim2.new(0, 150, 0, 40)
+                            bb.StudsOffset = Vector3.new(0, 2, 0)
+                            bb.AlwaysOnTop = true
+                            bb.Parent = espFolder
+                            
+                            local txt = Instance.new("TextLabel")
+                            txt.Size = UDim2.new(1, 0, 1, 0)
+                            txt.BackgroundTransparency = 1
+                            txt.Font = Enum.Font.GothamBold
+                            txt.TextSize = 12
+                            txt.TextColor3 = Color3.fromRGB(0, 255, 128)
+                            txt.TextStrokeTransparency = 0.2
+                            
+                            local kg = getEggKg(egg)
+                            if kg then
+                                txt.Text = egg.Name .. "\n[" .. kg .. (tostring(kg):lower():find("kg") and "" or " kg") .. "]"
+                            else
+                                txt.Text = egg.Name
+                            end
+                            txt.Parent = bb
+                            env.espCache[egg] = bb
                         end
-                        txt.Parent = bb
+                    else
+                        -- Remove ESP if target changed to something else
+                        if env.espCache[egg] then
+                            env.espCache[egg]:Destroy()
+                            env.espCache[egg] = nil
+                        end
                     end
                 end
             end
+        else
+            -- Clean all ESPs when disabled
+            for e, bb in pairs(env.espCache) do
+                bb:Destroy()
+            end
+            table.clear(env.espCache)
         end
-        task.wait(1)
+        
+        -- Cleanup destroyed eggs from cache
+        for e, bb in pairs(env.espCache) do
+            if not e or not e.Parent then
+                bb:Destroy()
+                env.espCache[e] = nil
+            end
+        end
+        
+        task.wait(0.5)
     end
 end)
 
--- ===================== AUTO BUY LOOP (GHOST TP) =====================
+-- ===================== AUTO BUY LOOP (SIMPLE) =====================
 task.spawn(function()
     while env._menuId == myId do
         if env.autoBuyEgg then
             local remote = RS:FindFirstChild("Remotes") and RS.Remotes:FindFirstChild("Game") and RS.Remotes.Game:FindFirstChild("BuyHalloweenEgg")
-            if remote then 
-                pcall(function() 
-                    local hrp = charHRP()
-                    if hrp then
-                        local dist = (hrp.Position - HALLOWEEN_COORDS.Position).Magnitude
-                        if dist > 50 then
-                            local oldPos = hrp.CFrame
-                            hrp.CFrame = HALLOWEEN_COORDS
-                            task.wait(0.2)
-                            remote:InvokeServer("Halloween Egg")
-                            task.wait(0.2)
-                            hrp.CFrame = oldPos 
-                        else
-                            remote:InvokeServer("Halloween Egg")
-                        end
-                    end
-                end) 
-            end
+            if remote then pcall(function() remote:InvokeServer("Halloween Egg") end) end
         end
         task.wait(1)
     end
@@ -1147,10 +1160,11 @@ env._menuCleanup = function()
     env.autoVolcanicEgg = false
     env.autoBuyEgg = false
     env.espEnabled = false
+    for e, bb in pairs(env.espCache or {}) do if bb then bb:Destroy() end end
     if env._espFolder then pcall(function() env._espFolder:Destroy() end) end
     updateFlyingState()
     env._menuId = env._menuId + 1
     screenGui:Destroy()
 end
 
-print("[Menu Halloween v27 | Fixed Dropdown Lists] loaded.")
+print("[Menu Halloween v29 | Smooth ESP & Deep KG Scan] loaded.")
