@@ -1,5 +1,5 @@
 --[[=====================================================
-    AUTO THROW (+20 MAX POWER) & ANTI-AFK
+    AUTO THROW (+20 MAX POWER) - 3-STEP HANDSHAKE
 =====================================================]]
 
 local Players = game:GetService("Players")
@@ -14,6 +14,14 @@ env._throwId = (env._throwId or 0) + 1
 local myId = env._throwId
 
 env.autoThrow = false
+
+-- The exact starting line coordinates you provided
+local THROW_COORDS = CFrame.new(3, 6.325932025909424, -41)
+
+local function charHRP()
+    local c = plr.Character
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
 
 -- ===================== [ UI SETUP ] =====================
 local screenGui = Instance.new("ScreenGui")
@@ -33,8 +41,8 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 32)
-titleLabel.BackgroundColor3 = Color3.fromRGB(0, 255, 128) -- Neon Green Accent
-titleLabel.Text = " Auto Throw (+20)"
+titleLabel.BackgroundColor3 = Color3.fromRGB(0, 255, 128)
+titleLabel.Text = " Perfect Throw (+20)"
 titleLabel.TextColor3 = Color3.new(0, 0, 0)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 13
@@ -107,23 +115,34 @@ task.spawn(function()
     local remotes = RS:WaitForChild("Remotes")
     local startRemote = remotes:WaitForChild("Throw_Start")
     local resolveRemote = remotes:WaitForChild("Throw_Resolve")
+    local completeRemote = remotes:WaitForChild("Throw_Complete")
     
     while env._throwId == myId do
         if env.autoThrow then
-            pcall(function()
-                -- 1. Start the throw meter
-                startRemote:InvokeServer()
+            local hrp = charHRP()
+            if hrp then
+                -- 1. Teleport to the exact throw line
+                hrp.CFrame = THROW_COORDS
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                task.wait(0.5) -- Give the server half a second to register you are standing in the zone
                 
-                -- Short delay to allow the server to register the throw state
-                task.wait(0.2) 
+                -- We wrap the InvokeServer sequence in a pcall so if the server lags, it doesn't crash the script
+                pcall(function()
+                    -- 2. Step 1: Tell server we are starting the throw
+                    startRemote:InvokeServer()
+                    task.wait(0.2)
+                    
+                    -- 3. Step 2: Hit the perfect +20 multiplier (1.0 = 100% power)
+                    resolveRemote:InvokeServer(1)
+                    task.wait(0.2)
+                    
+                    -- 4. Step 3: Tell server the throw animation has finished
+                    completeRemote:InvokeServer()
+                end)
                 
-                -- 2. Resolve the throw with exactly 1.0 (100% power for a guaranteed +20)
-                resolveRemote:InvokeServer(1)
-            end)
-            
-            -- Wait for the throw animation and cooldown to finish before repeating
-            -- You can adjust this number if the game allows you to throw faster
-            task.wait(2.5) 
+                -- 5. Wait a few seconds for the game to reset your character before throwing again
+                task.wait(4)
+            end
         else
             task.wait(0.2)
         end
@@ -136,4 +155,4 @@ env._throwCleanup = function()
     screenGui:Destroy()
 end
 
-print("Perfect Auto Throw (+20) Loaded.")
+print("Perfect Auto Throw (+20) Handshake Loaded.")
