@@ -1,5 +1,5 @@
 --[[=====================================================
-    AUTO POP-UP BONUS (Targeted UI Clicker + Deep Sweep)
+    AUTO POP-UP BONUS (Optimized & Lag-Free)
 =====================================================]]
 
 local Players = game:GetService("Players")
@@ -31,7 +31,7 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 32)
-titleLabel.BackgroundColor3 = Color3.fromRGB(150, 50, 255) -- Purple Accent for the Purple Button
+titleLabel.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
 titleLabel.Text = " Auto Pop-Up Bonus"
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
 titleLabel.Font = Enum.Font.GothamBold
@@ -74,7 +74,6 @@ toggleBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ===================== [ PHYSICAL UI CLICKER ] =====================
--- This physically forces the purple button to be clicked, even if it's in the 3D world
 local function forceClickButton(btn)
     if firesignal then
         pcall(function() firesignal(btn.MouseButton1Click) end)
@@ -87,68 +86,68 @@ local function forceClickButton(btn)
     end
 end
 
-task.spawn(function()
-    while env._popupId == myId do
-        if env.autoPopup then
-            -- Scan both PlayerGui and Workspace (for BillboardGuis hovering in the world)
-            local scanAreas = {plr:WaitForChild("PlayerGui"), workspace}
-            
-            for _, area in ipairs(scanAreas) do
-                for _, obj in ipairs(area:GetDescendants()) do
-                    if obj:IsA("ImageButton") or obj:IsA("TextButton") then
-                        local name = string.lower(obj.Name)
-                        local isTarget = false
-                        
-                        -- Target 1: Buttons inside 3D BillboardGuis (Like the purple circle)
-                        if obj:FindFirstAncestorOfClass("BillboardGui") then
-                            isTarget = true
-                        end
-                        
-                        -- Target 2: Buttons explicitly named as a tap bonus
-                        if name:find("bonus") or name:find("tap") or name:find("popup") then
-                            isTarget = true
-                        end
-                        
-                        if isTarget then
-                            forceClickButton(obj)
-                            -- Hide it instantly so it doesn't stay on your screen
-                            pcall(function() obj.Visible = false end)
-                        end
-                    end
-                end
-            end
+local function checkAndClick(obj)
+    if obj:IsA("ImageButton") or obj:IsA("TextButton") then
+        local name = string.lower(obj.Name)
+        local isTarget = false
+        
+        if obj:FindFirstAncestorOfClass("BillboardGui") then
+            isTarget = true
         end
-        task.wait(0.5) -- Scans twice a second
+        
+        if name:find("bonus") or name:find("tap") or name:find("popup") then
+            isTarget = true
+        end
+        
+        if isTarget and obj.Visible then
+            forceClickButton(obj)
+            pcall(function() obj.Visible = false end)
+        end
     end
-end)
+end
+
+-- Scan currently existing buttons once
+for _, area in ipairs({plr:WaitForChild("PlayerGui"), workspace}) do
+    for _, obj in ipairs(area:GetDescendants()) do
+        checkAndClick(obj)
+    end
+end
+
+-- Event-based listener (Zero Lag): Only checks items exactly when they are created
+local connections = {}
+table.insert(connections, workspace.DescendantAdded:Connect(function(obj)
+    if env.autoPopup then checkAndClick(obj) end
+end))
+table.insert(connections, plr.PlayerGui.DescendantAdded:Connect(function(obj)
+    if env.autoPopup then checkAndClick(obj) end
+end))
 
 -- ===================== [ DEEP REMOTE SWEEPER ] =====================
--- This runs in the background just in case you are Ghost Farming underground and the UI clicker can't reach it
 task.spawn(function()
     local remote = RS:WaitForChild("Remotes"):WaitForChild("Training_TapBonus")
     local sweepId = 1
     
     while env._popupId == myId do
         if env.autoPopup then
-            -- Fires a block of 30 IDs at a time to catch the bonus instantly without lagging the server
-            for i = sweepId, sweepId + 30 do
+            -- Reduced to 10 IDs per second to prevent network lag/ping spikes
+            for i = sweepId, sweepId + 10 do
                 task.spawn(function()
                     pcall(function() remote:InvokeServer(i) end)
                 end)
             end
             
-            sweepId = sweepId + 30
-            -- Reset sweep once it gets too high to guarantee we don't miss new ones
+            sweepId = sweepId + 10
             if sweepId > 5000 then sweepId = 1 end 
         end
-        task.wait(0.2)
+        task.wait(1) -- Heavy throttle added here
     end
 end)
 
 env._popupCleanup = function()
     env.autoPopup = false
     env._popupId = env._popupId + 1
+    for _, conn in ipairs(connections) do conn:Disconnect() end
     screenGui:Destroy()
 end
 
-print("Ultimate Auto Pop-Up Bonus Loaded.")
+print("Optimized Auto Pop-Up Bonus Loaded.")
