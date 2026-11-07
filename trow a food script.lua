@@ -1,5 +1,5 @@
 --[[=====================================================
-    AUTO THROW (+20 MAX POWER) - 3-STEP HANDSHAKE
+    AUTO THROW (+20 MAX) - STABILIZED TIMING
 =====================================================]]
 
 local Players = game:GetService("Players")
@@ -15,7 +15,7 @@ local myId = env._throwId
 
 env.autoThrow = false
 
--- The exact starting line coordinates you provided
+-- The exact starting line coordinates
 local THROW_COORDS = CFrame.new(3, 6.325932025909424, -41)
 
 local function charHRP()
@@ -121,27 +121,35 @@ task.spawn(function()
         if env.autoThrow then
             local hrp = charHRP()
             if hrp then
-                -- 1. Teleport to the exact throw line
+                -- 1. Teleport to the throw line
                 hrp.CFrame = THROW_COORDS
                 hrp.AssemblyLinearVelocity = Vector3.zero
-                task.wait(0.5) -- Give the server half a second to register you are standing in the zone
+                task.wait(0.5) 
                 
-                -- We wrap the InvokeServer sequence in a pcall so if the server lags, it doesn't crash the script
-                pcall(function()
-                    -- 2. Step 1: Tell server we are starting the throw
-                    startRemote:InvokeServer()
-                    task.wait(0.2)
-                    
-                    -- 3. Step 2: Hit the perfect +20 multiplier (1.0 = 100% power)
-                    resolveRemote:InvokeServer(1)
-                    task.wait(0.2)
-                    
-                    -- 4. Step 3: Tell server the throw animation has finished
-                    completeRemote:InvokeServer()
+                -- 2. Start the throw (Thread isolated)
+                task.spawn(function()
+                    pcall(function() startRemote:InvokeServer() end)
                 end)
                 
-                -- 5. Wait a few seconds for the game to reset your character before throwing again
-                task.wait(4)
+                -- Wait for the meter to physically appear on screen
+                task.wait(0.8)
+                
+                -- 3. Resolve the throw with perfect +20 power (Thread isolated)
+                task.spawn(function()
+                    pcall(function() resolveRemote:InvokeServer(1) end)
+                end)
+                
+                -- 4. Wait for the pet/object to fly and land
+                -- IMPORTANT: If your throws are going super far and taking longer than 4 seconds to land, increase this number!
+                task.wait(4.0)
+                
+                -- 5. Complete the throw (Thread isolated)
+                task.spawn(function()
+                    pcall(function() completeRemote:InvokeServer() end)
+                end)
+                
+                -- Wait for the game to reset your character before looping again
+                task.wait(1.5)
             end
         else
             task.wait(0.2)
@@ -155,4 +163,4 @@ env._throwCleanup = function()
     screenGui:Destroy()
 end
 
-print("Perfect Auto Throw (+20) Handshake Loaded.")
+print("Stabilized Auto Throw (+20) Loaded.")
