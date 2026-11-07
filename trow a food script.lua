@@ -1,5 +1,5 @@
 --[[=====================================================
-    AUTO THROW (+20 MAX) - STABILIZED TIMING
+    AUTO THROW (+20 MAX) - LEGIT CINEMATIC SYNC
 =====================================================]]
 
 local Players = game:GetService("Players")
@@ -15,9 +15,6 @@ local myId = env._throwId
 
 env.autoThrow = false
 
--- The exact starting line coordinates
-local THROW_COORDS = CFrame.new(3, 6.325932025909424, -41)
-
 local function charHRP()
     local c = plr.Character
     return c and c:FindFirstChild("HumanoidRootPart")
@@ -30,7 +27,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = plr:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.fromOffset(240, 110)
+mainFrame.Size = UDim2.fromOffset(240, 130) -- Expanded to fit Status text
 mainFrame.Position = UDim2.new(0.5, -120, 0.7, -120)
 mainFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
 mainFrame.BorderSizePixel = 0
@@ -68,6 +65,16 @@ toggleBtn.TextSize = 13
 toggleBtn.BorderSizePixel = 0
 toggleBtn.Parent = mainFrame
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -24, 0, 20)
+statusLabel.Position = UDim2.new(0, 12, 1, -25)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 11
+statusLabel.Text = "Status: Idle"
+statusLabel.Parent = mainFrame
 
 -- ===================== [ BUTTON LOGIC ] =====================
 toggleBtn.MouseButton1Click:Connect(function()
@@ -115,43 +122,30 @@ task.spawn(function()
     local remotes = RS:WaitForChild("Remotes")
     local startRemote = remotes:WaitForChild("Throw_Start")
     local resolveRemote = remotes:WaitForChild("Throw_Resolve")
-    local completeRemote = remotes:WaitForChild("Throw_Complete")
     
     while env._throwId == myId do
         if env.autoThrow then
             local hrp = charHRP()
             if hrp then
-                -- 1. Teleport to the throw line
-                hrp.CFrame = THROW_COORDS
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                task.wait(0.5) 
+                -- 1. Tell game we are starting. The game will naturally move your character to the line.
+                statusLabel.Text = "Status: Readying Throw..."
+                task.spawn(function() pcall(function() startRemote:InvokeServer() end) end)
                 
-                -- 2. Start the throw (Thread isolated)
-                task.spawn(function()
-                    pcall(function() startRemote:InvokeServer() end)
-                end)
+                -- Wait for the client to fully transition the camera and display the +20 meter
+                task.wait(2.0) 
+                if not env.autoThrow then break end
                 
-                -- Wait for the meter to physically appear on screen
-                task.wait(0.8)
+                -- 2. Hit the perfect +20 multiplier (1.0 = 100% power)
+                statusLabel.Text = "Status: Hitting MAX (+20)..."
+                task.spawn(function() pcall(function() resolveRemote:InvokeServer(1) end) end)
                 
-                -- 3. Resolve the throw with perfect +20 power (Thread isolated)
-                task.spawn(function()
-                    pcall(function() resolveRemote:InvokeServer(1) end)
-                end)
-                
-                -- 4. Wait for the pet/object to fly and land
-                -- IMPORTANT: If your throws are going super far and taking longer than 4 seconds to land, increase this number!
-                task.wait(4.0)
-                
-                -- 5. Complete the throw (Thread isolated)
-                task.spawn(function()
-                    pcall(function() completeRemote:InvokeServer() end)
-                end)
-                
-                -- Wait for the game to reset your character before looping again
-                task.wait(1.5)
+                -- 3. Wait for the natural cinematic to play out. 
+                -- We let the game's native LocalScripts fire 'Throw_Complete' when the item hits the ground.
+                statusLabel.Text = "Status: Waiting for landing..."
+                task.wait(7.0)
             end
         else
+            statusLabel.Text = "Status: Idle"
             task.wait(0.2)
         end
     end
@@ -163,4 +157,4 @@ env._throwCleanup = function()
     screenGui:Destroy()
 end
 
-print("Stabilized Auto Throw (+20) Loaded.")
+print("Perfect Auto Throw (+20) Legit Sync Loaded.")
